@@ -1,0 +1,6 @@
+timestamp,party_size,queue_length,tables_available,wait_time
+18:00,2,5,3,12
+18:10,4,7,2,20
+18:15,2,6,2,15
+18:20,3,8,1,25
+18:25,5,10,0,35
