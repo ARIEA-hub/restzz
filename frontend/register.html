@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Reserve a Table | Q-Sense</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<script>
+    const API_URL = "http://127.0.0.1:8000";
+
+    document.getElementById("reservationForm").addEventListener("submit", async function(e){
+
+    e.preventDefault()
+
+    const name = document.querySelector("input[type='text']").value
+    const phone = document.querySelector("input[type='tel']").value
+    const guests = document.querySelector("input[type='number']").value
+    const date = document.querySelector("input[type='date']").value
+    const time = document.querySelector("input[type='time']").value
+
+    const response = await fetch("http://127.0.0.1:8000/reservations/simple",{
+
+    method:"POST",
+    headers:{
+    "Content-Type":"application/json"
+    },
+
+    body:JSON.stringify({
+    name:name,
+    phone:phone,
+    guests:guests,
+    date:date,
+    time:time
+    })
+
+    })
+
+    const result = await response.json()
+
+    alert("Reservation confirmed!")
+
+    })
+</script>
+<body>
+
+<div class="container">
+    <div class="card form-card">
+        <h2>Reserve a Table</h2>
+
+        <form id="reservationForm">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" placeholder="Enter your name" required>
+            </div>
+
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" placeholder="Enter phone number" required>
+            </div>
+
+            <div class="form-group">
+                <label>Group Size</label>
+                <input type="number" min="1" max="20" required>
+            </div>
+
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" required>
+            </div>
+
+            <div class="form-group">
+                <label>Time</label>
+                <input type="time" required>
+            </div>
+
+            <button type="submit" class="btn primary full-width">
+                Confirm Reservation
+            </button>
+        </form>
+
+        <a href="index.html" class="back-link">← Back</a>
+    </div>
+</div>
+
+</body>
+</html>

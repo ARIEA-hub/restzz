@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | Live Locations (Mumbai)</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        /* Specific Layout for the Map Page */
+        .locations-wrapper {
+            display: flex;
+            height: calc(100vh - 70px); /* Fill screen minus navbar */
+            overflow: hidden;
+        }
+
+        /* Sidebar for Filters & List */
+        .sidebar {
+            width: 350px;
+            background: white;
+            border-right: 1px solid #e1e8ed;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            z-index: 1000;
+        }
+
+        .sidebar h2 {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .filter-group {
+            margin-bottom: 15px;
+        }
+
+        .filter-group label {
+            display: block;
+            font-size: 0.9rem;
+            color: #555;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .filter-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            outline-color: #3178c6;
+        }
+
+        .restaurant-list {
+            flex: 1;
+            overflow-y: auto;
+            margin-top: 15px;
+            padding-right: 5px;
+        }
+
+        .restaurant-card {
+            border: 1px solid #e1e8ed;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .restaurant-card:hover {
+            border-color: #3178c6;
+            background: #f4f7f9;
+        }
+
+        .restaurant-card h3 {
+            font-size: 1.1rem;
+            color: #3178c6;
+            margin-bottom: 5px;
+        }
+
+        .restaurant-card p {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .tables-badge {
+            display: inline-block;
+            background: #eef5fb;
+            color: #3178c6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            border: 1px solid #3178c6;
+        }
+
+        /* The Map Container */
+        #map {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            z-index: 1; /* Keep it below navbar */
+        }
+
+        /* Custom Popup styling */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+        }
+        .popup-content h4 { margin: 0 0 5px 0; color: #3178c6; }
+        .popup-content p { margin: 0 0 10px 0; font-size: 0.85rem; color: #555; }
+        .popup-btn {
+            background: #3178c6;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            width: 100%;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<script>
+    const API_URL = "http://127.0.0.1:8000";
+    async function loadRestaurants(){
+    const response = await fetch("http://127.0.0.1:8000/restaurants")
+    const restaurants = await response.json()
+    renderData(restaurants)
+    }
+
+    loadRestaurants()
+</script>
+<body>
+
+    <header class="navbar">
+        <div class="logo">
+            <span class="icon">🍴</span>
+            <h1>Q-Sense</h1>
+        </div>
+        <nav>
+            <a href="#">Home</a>
+         
+            <a href="#" style="color: #3178c6; border-bottom: 2px solid #3178c6; padding-bottom: 5px;">Locations</a>
+            <a href="CustomerReservation.html">Reservations</a>
+            <div class="user-profile">
+                <a href="#" style="color: #3178c6; font-weight: 600; text-decoration: none;">Sign In</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="locations-wrapper">
+        <aside class="sidebar">
+            <h2>Find Nearby</h2>
+            
+            <div class="filter-group">
+                <label>Cuisine Type</label>
+                <select id="cuisineFilter" onchange="applyFilters()">
+                    <option value="All">All Cuisines</option>
+                    <option value="Asian">Asian / Chinese</option>
+                    <option value="Indian">Indian / Modern Indian</option>
+                    <option value="Continental">Continental</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Distance from me</label>
+                <select id="distanceFilter" onchange="applyFilters()">
+                    <option value="5">Within 5 km</option>
+                    <option value="3">Within 3 km</option>
+                    <option value="1">Within 1 km</option>
+                </select>
+            </div>
+
+            <div class="restaurant-list" id="restaurantList">
+                </div>
+        </aside>
+
+        <div id="map"></div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 1. Initialize Map centered on Mumbai (Bandra West) to restrict RAM usage
+        // Central Coordinates roughly around Linking Road, Bandra.
+        const userLocation = { lat: 19.0600, lng: 72.8350 };
+        const map = L.map('map').setView([userLocation.lat, userLocation.lng], 15);
+
+        // Load OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        // Add a "User Location" Marker
+        L.marker([userLocation.lat, userLocation.lng])
+            .addTo(map)
+            .bindPopup('<b>You are here</b><br>Bandra, Mumbai').openPopup();
+
+        // 2. Simulated Database of Mumbai Restaurants
+        const restaurants = [
+            { id: 1, name: "Foo Bandra", lat: 19.060038, lng: 72.836275, cuisine: "Asian", tablesAvailable: 4, distance: 0.2 },
+            { id: 2, name: "Bandra Born", lat: 19.050472, lng: 72.826998, cuisine: "Indian", tablesAvailable: 12, distance: 1.8 },
+            { id: 3, name: "Veranda Bandra", lat: 19.066789, lng: 72.830283, cuisine: "Indian", tablesAvailable: 2, distance: 0.8 },
+            { id: 4, name: "The Nest Bandra", lat: 19.056281, lng: 72.834321, cuisine: "Continental", tablesAvailable: 8, distance: 0.5 },
+            { id: 5, name: "Copper Chimney", lat: 19.060868, lng: 72.836597, cuisine: "Indian", tablesAvailable: 0, distance: 0.3 }
+        ];
+
+        let markers = [];
+
+        // 3. Render Map Markers and Sidebar List
+        function renderData(data) {
+            // Clear existing markers from map
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            // Clear sidebar list
+            const listContainer = document.getElementById('restaurantList');
+            listContainer.innerHTML = '';
+
+            data.forEach(res => {
+                // Color Code markers based on availability
+                let markerColor = res.tablesAvailable > 0 ? "blue" : "red";
+                let availabilityText = res.tablesAvailable > 0 ? `${res.tablesAvailable} Tables Available` : `Fully Booked`;
+
+                // Add map marker
+                let marker = L.marker([res.lat, res.lng]).addTo(map)
+                    .bindPopup(`
+                        <div class="popup-content">
+                            <h4>${res.name}</h4>
+                            <p>${res.cuisine} &bull; ${res.distance} km away</p>
+                            <span class="tables-badge" style="${res.tablesAvailable === 0 ? 'background:#fdf2f2; color:#d9534f; border-color:#d9534f;' : ''}">${availabilityText}</span>
+                            <br><br>
+                            ${res.tablesAvailable > 0 ? `<button class="popup-btn" onclick="window.location.href='#'">Book Now</button>` : `<button class="popup-btn" style="background:#ccc; cursor:not-allowed;" disabled>Join Waitlist</button>`}
+                        </div>
+                    `);
+                markers.push(marker);
+
+                // Add to Sidebar
+                listContainer.innerHTML += `
+                    <div class="restaurant-card" onclick="focusOnMap(${res.lat}, ${res.lng})">
+                        <h3>${res.name}</h3>
+                        <p>${res.cuisine} &bull; ${res.distance} km away</p>
+                        <span class="tables-badge" style="${res.tablesAvailable === 0 ? 'background:#fdf2f2; color:#d9534f; border-color:#d9534f;' : ''}">${availabilityText}</span>
+                    </div>
+                `;
+            });
+        }
+
+        // 4. Filtering Logic based on User Input
+        function applyFilters() {
+            const selectedCuisine = document.getElementById('cuisineFilter').value;
+            const maxDistance = parseFloat(document.getElementById('distanceFilter').value);
+
+            const filteredData = restaurants.filter(res => {
+                const cuisineMatch = selectedCuisine === "All" || res.cuisine === selectedCuisine;
+                const distanceMatch = res.distance <= maxDistance;
+                return cuisineMatch && distanceMatch;
+            });
+
+            renderData(filteredData);
+        }
+
+        // 5. Allow clicking sidebar item to pan to map marker
+        function focusOnMap(lat, lng) {
+            map.flyTo([lat, lng], 17, { animate: true, duration: 1 });
+        }
+
+        // Initial render on page load
+        renderData(restaurants);
+    </script>
+
+</body>
+</html>

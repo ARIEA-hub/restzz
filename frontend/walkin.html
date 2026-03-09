@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Join Live Queue | Q-Sense</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<script>
+    const API_URL = "http://127.0.0.1:8000";
+    document.getElementById("queueForm").addEventListener("submit", async function(e){
+
+    e.preventDefault()
+
+    const name = document.querySelector("input[type='text']").value
+    const groupSize = document.querySelector("input[type='number']").value
+
+    const response = await fetch("http://127.0.0.1:8000/queue/join",{
+
+    method:"POST",
+    headers:{
+    "Content-Type":"application/json"
+    },
+
+    body:JSON.stringify({
+    name:name,
+    group_size:groupSize
+    })
+
+    })
+
+    const data = await response.json()
+
+    alert("You joined queue. Position: " + data.position)
+
+    })
+
+</script>
+<body>
+        <h2>Join Live Queue</h2>
+        <form id="queueForm">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" placeholder="Enter your name" required>
+            </div>
+
+            <div class="form-group">
+                <label>Group Size</label>
+                <input type="number" min="1" max="20" required>
+            </div>
+
+            <button type="submit" class="btn secondary full-width">
+                Join Queue
+            </button>
+        </form>
+
+        <a href="index.html" class="back-link">← Back</a>
+</body>
+</html>

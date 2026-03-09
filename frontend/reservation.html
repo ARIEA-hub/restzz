@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | Table Reservations</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<script>
+    const API_URL = "http://127.0.0.1:8000";
+    async function loadTables(){
+
+    const response = await fetch("http://127.0.0.1:8000/tables")
+
+    const tables = await response.json()
+
+    updateTableUI(tables)
+
+    }
+
+    loadTables()
+</script>
+<body>
+
+    <header class="navbar">
+        <div class="logo">
+            <span class="icon">🍴</span>
+            <h1>Q-Sense</h1>
+        </div>
+        <nav>
+            <a href="#">Dashboard</a>
+            <a href="#">Customers</a>
+            <a href="#" style="color: #3178c6; border-bottom: 2px solid #3178c6; padding-bottom: 5px;">Tables</a>
+            <a href="#">Reports</a>
+            <div class="user-profile">
+                <div class="avatar"></div>
+                <span>Restaurant Admin</span>
+            </div>
+        </nav>
+    </header>
+
+    <main class="reservation-container">
+        
+        <div class="stats-row">
+            <div class="stat-card">
+                <h3>Total Tables</h3>
+                <p class="stat-number">24</p>
+            </div>
+            <div class="stat-card">
+                <h3>Available</h3>
+                <p class="stat-number available-text">15</p>
+            </div>
+            <div class="stat-card">
+                <h3>Reserved</h3>
+                <p class="stat-number reserved-text">9</p>
+            </div>
+        </div>
+
+        <div class="reservation-layout">
+            <div class="reservation-form card">
+                <h2>Book a Table</h2>
+                <form>
+                    <div class="input-group">
+                        <label>Select Restaurant</label>
+                        <select required>
+                            <option value="">Choose a location...</option>
+                            <option value="downtown">Q-Sense Downtown</option>
+                            <option value="uptown">Q-Sense Uptown</option>
+                            <option value="bayarea">Q-Sense Bay Area</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label>Group Size</label>
+                            <input type="number" min="1" max="20" placeholder="No. of guests" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Date</label>
+                            <input type="date" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Time</label>
+                        <input type="time" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Special Requests (Optional)</label>
+                        <input type="text" placeholder="E.g., High chair, anniversary...">
+                    </div>
+
+                    <button type="submit" class="login-btn full-width">Reserve Table</button>
+                </form>
+            </div>
+
+            <div class="table-map card">
+                <div class="map-header">
+                    <h2>Floor Plan</h2>
+                    <div class="legend">
+                        <span class="legend-item"><span class="dot dot-available"></span> Available</span>
+                        <span class="legend-item"><span class="dot dot-reserved"></span> Reserved</span>
+                    </div>
+                </div>
+                
+                <div class="tables-grid">
+                    <div class="table-item table-available">T1<br><span>2 Seats</span></div>
+                    <div class="table-item table-available">T2<br><span>2 Seats</span></div>
+                    <div class="table-item table-reserved">T3<br><span>4 Seats</span></div>
+                    <div class="table-item table-reserved">T4<br><span>4 Seats</span></div>
+                    <div class="table-item table-available">T5<br><span>4 Seats</span></div>
+                    <div class="table-item table-available">T6<br><span>6 Seats</span></div>
+                    <div class="table-item table-reserved">T7<br><span>2 Seats</span></div>
+                    <div class="table-item table-available">T8<br><span>2 Seats</span></div>
+                    <div class="table-item table-available">T9<br><span>8 Seats</span></div>
+                    <div class="table-item table-reserved">T10<br><span>4 Seats</span></div>
+                    <div class="table-item table-available">T11<br><span>4 Seats</span></div>
+                    <div class="table-item table-available">T12<br><span>4 Seats</span></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
+    </footer>
+
+</body>
+</html>

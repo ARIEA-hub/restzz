@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | Book a Table</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<script>
+    const API_URL = "http://127.0.0.1:8000";
+</script>
+<body>
+
+    <header class="navbar">
+        <div class="logo">
+            <span class="icon">🍴</span>
+            <h1>Q-Sense</h1>
+        </div>
+        <nav>
+            <a href="#">Home</a>
+            
+            <a href="locations.html">Locations</a>
+            <a href="#" style="color: #3178c6; border-bottom: 2px solid #3178c6; padding-bottom: 5px;">Reservations</a>
+            <div class="user-profile">
+                <a href="#" class="login-link">Sign In</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="customer-booking-container">
+        <div class="booking-card">
+            <div class="booking-header">
+                <h2>Find a Table</h2>
+                <p>Reserve your spot at any of our Q-Sense locations.</p>
+            </div>
+
+            <form id="customerReservationForm">
+                <div class="search-criteria">
+                    <div class="input-group">
+                        <label>Location</label>
+                        <select required>
+                            <option value="">Select a restaurant...</option>
+                            <option value="downtown">Q-Sense Downtown</option>
+                            <option value="uptown">Q-Sense Uptown</option>
+                            <option value="bayarea">Q-Sense Bay Area</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="input-group">
+                            <label>Party Size</label>
+                            <select required>
+                                <option value="2">2 People</option>
+                                <option value="3">3 People</option>
+                                <option value="4">4 People</option>
+                                <option value="5">5 People</option>
+                                <option value="6">6 People</option>
+                                <option value="7">7+ (Call Restaurant)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Date</label>
+                            <input type="date" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="time-selection">
+                    <label>Available Times</label>
+                    <div class="time-slots">
+                        <label class="time-slot">
+                            <input type="radio" name="time" value="18:00" required>
+                            <span>6:00 PM</span>
+                        </label>
+                        <label class="time-slot">
+                            <input type="radio" name="time" value="18:30">
+                            <span>6:30 PM</span>
+                        </label>
+                        <label class="time-slot">
+                            <input type="radio" name="time" value="19:00">
+                            <span>7:00 PM</span>
+                        </label>
+                        <label class="time-slot">
+                            <input type="radio" name="time" value="19:30" disabled>
+                            <span class="booked">7:30 PM</span>
+                        </label>
+                        <label class="time-slot">
+                            <input type="radio" name="time" value="20:00">
+                            <span>8:00 PM</span>
+                        </label>
+                        <label class="time-slot">
+                            <input type="radio" name="time" value="20:30">
+                            <span>8:30 PM</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="guest-details">
+                    <label>Your Details</label>
+                    <div class="form-row">
+                        <div class="input-group">
+                            <input type="text" placeholder="First Name" required>
+                        </div>
+                        <div class="input-group">
+                            <input type="text" placeholder="Last Name" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="input-group">
+                            <input type="email" placeholder="Email Address" required>
+                        </div>
+                        <div class="input-group">
+                            <input type="tel" placeholder="Phone Number" required>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <textarea placeholder="Add a special request (optional)..." rows="3"></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="login-btn full-width">Confirm Reservation</button>
+            </form>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
+    </footer>
+
+</body>
+</html>
