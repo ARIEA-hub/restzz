@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db');
+const db = require('../database');
 
 router.get('/restaurant/:id', async (req, res) => {
     const restaurantId = req.params.id;

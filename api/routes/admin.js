@@ -1,7 +1,7 @@
 console.log("Admin route file loaded.");
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db');
+const db = require('../database'); 
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer'); // Bring in your email sender!
 

@@ -1,13 +1,12 @@
 require('dotenv').config();
-console.log("DB_USER: " + process.env.DB_USER);
 
 const express = require('express');
 const cors = require('cors');
-const db = require('./config/db.js');
+const db = require('./database.js');
 const app = express();
 
 app.use(cors({
-    origin: '*', 
+    origin: process.env.FRONTEND_ORIGIN,                 
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
 }));

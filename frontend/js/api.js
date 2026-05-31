@@ -7,4 +7,17 @@ const data = await response.json();
 
 return data;
 
+}   
+const API_BASE = 'http://localhost:5000/api';
+
+async function apiFetch(endpoint, options = {}) {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options
+    });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP Error ${response.status}`);
+    }
+    return response.json();
 }

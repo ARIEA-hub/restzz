@@ -1,7 +1,7 @@
 console.log("Users route file loaded.");
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db');
+const db = require('../database'); 
 const bcrypt = require('bcrypt');
 
 // 1. Register alias
