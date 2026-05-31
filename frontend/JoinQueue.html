@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | Live Waitlist</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: #f4f7f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        
+        .queue-card {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        h2 { color: #3178c6; margin-bottom: 10px; font-size: 1.8rem; }
+        p.subtitle { color: #666; margin-bottom: 30px; }
+
+        #join-section { display: block; }
+        .input-group { margin-bottom: 25px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
+        .input-group select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+        
+        .btn { width: 100%; background: #3178c6; color: white; border: none; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn:hover { background: #255a96; }
+
+   
+        #tracker-section { display: none; }
+        .ticket {
+            background: #f8fbff;
+            border: 2px dashed #3178c6;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 25px;
+            position: relative;
+        }
+        .position-label { color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; }
+        .position-number { font-size: 5rem; color: #3178c6; font-weight: 700; line-height: 1; margin: 10px 0; }
+        
+        .status-badge {
+            display: inline-block;
+            background: #eef5fb;
+            color: #3178c6;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .status-badge.called { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+
+        .wait-time { font-size: 1.2rem; color: #333; font-weight: 600; margin-bottom: 5px; }
+        .people-ahead { color: #888; font-size: 0.9rem; }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3178c6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="queue-card">
+        <h2>Live Waitlist</h2>
+        <p class="subtitle" id="restaurant-display">Loading restaurant info...</p>
+
+        <div id="join-section">
+            <form id="join-form">
+                <div class="input-group">
+                    <label>How many people in your party?</label>
+                    <select id="group-size" required>
+                        <option value="1">1 Person</option>
+                        <option value="2" selected>2 People</option>
+                        <option value="3">3 People</option>
+                        <option value="4">4 People</option>
+                        <option value="5">5 People</option>
+                        <option value="6">6+ People</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">Join Waitlist</button>
+            </form>
+        </div>
+
+        <div id="tracker-section">
+            <div class="ticket">
+                <div class="position-label">Your Position</div>
+                <div class="position-number" id="display-position">--</div>
+                <div class="status-badge" id="display-status">Waiting</div>
+            </div>
+
+            <div class="wait-time"><span class="loader"></span> Estimated Wait: <span id="display-ewt">--</span> min</div>
+            <div class="people-ahead" id="display-ahead">-- parties ahead of you</div>
+        </div>
+    </div>
+
+    <script>
+      
+        const urlParams = new URLSearchParams(window.location.search);
+        const restaurantId = urlParams.get('restaurant_id');
+        const customerId = localStorage.getItem('customer_id'); 
+        
+        let pollingInterval;
+
+        window.addEventListener("DOMContentLoaded", () => {
+           
+            if (!customerId) {
+                alert("Please log in to join the queue!");
+                window.location.href = "CustomerLogin.html"; 
+                return;
+            }
+            if (!restaurantId) {
+                document.getElementById("restaurant-display").textContent = "Error: No restaurant selected.";
+                document.getElementById("join-section").style.display = "none";
+                return;
+            }
+
+            document.getElementById("restaurant-display").textContent = `Restaurant ID: ${restaurantId}`;
+
+            // Check if they are already in a queue! (Resume session)
+            const savedQueueId = localStorage.getItem('current_queue_id');
+            if (savedQueueId) {
+                switchToTracker(savedQueueId);
+            }
+        });
+
+        
+        document.getElementById("join-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const groupSize = document.getElementById("group-size").value;
+
+            try {
+                const res = await fetch("http://localhost:5000/api/queue/join", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        restaurant_id: restaurantId,
+                        customer_id: customerId,
+                        group_size: groupSize
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                   
+                    localStorage.setItem('current_queue_id', data.queue_id);
+                    switchToTracker(data.queue_id);
+                } else {
+                    alert(data.message); 
+                }
+            } catch (error) {
+                console.error("Error joining:", error);
+                alert("Failed to join. Check connection.");
+            }
+        });
+
+        
+        function switchToTracker(queueId) {
+            document.getElementById("join-section").style.display = "none";
+            document.getElementById("tracker-section").style.display = "block";
+            
+            fetchQueueStatus(queueId);
+            pollingInterval = setInterval(() => fetchQueueStatus(queueId), 5000);
+        }
+
+        async function fetchQueueStatus(queueId) {
+            try {
+                const res = await fetch(`http://localhost:5000/api/queue/status/${queueId}`);
+                const data = await res.json();
+
+                if (res.ok) {
+                
+                    document.getElementById("display-position").textContent = data.position;
+                    document.getElementById("display-ewt").textContent = data.estimated_wait_time;
+                    document.getElementById("display-ahead").textContent = `${data.people_ahead} parties ahead of you`;
+
+                    const statusBadge = document.getElementById("display-status");
+                    
+                    if (data.status === 'waiting') {
+                        statusBadge.textContent = "Waiting in Line";
+                        statusBadge.className = "status-badge";
+                    } else if (data.status === 'called') {
+                        statusBadge.textContent = "Your name is being called! Go to the host stand and get ready for your meal/";
+                        statusBadge.className = "status-badge called";
+                    } else if (data.status === 'seated' || data.status === 'cancelled') {
+                       
+                        clearInterval(pollingInterval);
+                        localStorage.removeItem('current_queue_id');
+                        statusBadge.textContent = data.status === 'seated' ? "Enjoy your meal!" : "Queue Cancelled";
+                        document.getElementById("display-position").textContent = "✓";
+                    }
+                }
+            } catch (error) {
+                console.error("Polling error:", error);
+            }
+        }
+    </script>
+</body>
+</html>

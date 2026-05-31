@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | Verify Identity</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+      
+        .otp-input {
+            font-size: 24px;
+            letter-spacing: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .instruction-text {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #555;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="navbar">
+        <div class="logo">
+            <span class="icon">🍴</span>
+            <h1>Q-Sense</h1>
+        </div>
+    </header>
+
+    <main class="login-container">
+        <div class="login-card">
+            <h2 style="text-align: center;">Verify Your Identity</h2>
+            <p class="instruction-text">
+                We've sent a 6-digit verification code to <br>
+                <strong id="display-email">your email</strong>.
+            </p>
+
+            <form id="otpForm">
+                <div class="input-group">
+                    <input type="text" id="otpInput" class="otp-input" placeholder="000000" maxlength="6" required autocomplete="off">
+                </div>
+                
+                <div class="action-row" style="justify-content: center; margin-top: 20px;">
+                    <button type="submit" class="login-btn full-width">Verify & Log In</button>
+                </div>
+            </form>
+            
+            <div style="text-align: center; margin-top: 15px;">
+                <a href="AdminLogin.html" style="color: #3178c6; text-decoration: none; font-size: 14px;">Back to Login</a>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            
+            const email = localStorage.getItem("temp_email");
+            const role = localStorage.getItem("temp_role");
+
+                     if (!email || !role) {
+                window.location.href = "AdminLogin.html";
+                return;
+            }
+
+         
+            document.getElementById("display-email").textContent = email;
+
+       
+        document.getElementById("otpForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    
+    const otp = document.getElementById("otpInput").value;
+    
+    // BUG 1 FIX: Grab the variables from local storage!
+    const email = localStorage.getItem("temp_email");
+    const role = localStorage.getItem("temp_role");
+
+    try {
+        const res = await fetch("http://localhost:5000/api/verify-otp", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ email, otp, role })
+        });
+
+        const data = await res.json();
+
+       if (data.success) {
+    if (role === 'admin' || role === 'staff' || role === 'manager') {
+        localStorage.setItem("admin_id", localStorage.getItem("temp_admin_id"));
+        localStorage.setItem("restaurant_id", localStorage.getItem("temp_restaurant_id"));
+        localStorage.setItem("role", localStorage.getItem("temp_role"));
+        localStorage.setItem("admin_email", email); 
+        localStorage.setItem("name",name);
+        
+        // Clean up temp variables
+        localStorage.removeItem("temp_email");
+        localStorage.removeItem("temp_admin_id");
+        localStorage.removeItem("temp_restaurant_id");
+        localStorage.removeItem("temp_role");
+        
+        // 🚨 FORCE THE ADMIN ROUTE HERE
+        window.location.href = "AdminDashboard.html"; 
+        
+    } else {
+        localStorage.setItem("customer_id", localStorage.getItem("temp_customer_id"));
+        
+        // Clean up temp variables
+        localStorage.removeItem("temp_email");
+        localStorage.removeItem("temp_customer_id");
+        localStorage.removeItem("temp_role");
+        
+        // 🚨 FORCE THE CUSTOMER ROUTE HERE (adjust to your preferred customer landing page)
+        window.location.href = "CustomerDashboard.html"; 
+    }
+} else {
+    alert(data.message);
+}
+    } catch (error) {
+        console.error("OTP Error:", error);
+        alert("An error occurred while verifying your code.");
+    }
+});
+        });
+    </script>
+</body>
+</html>

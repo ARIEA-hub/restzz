@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | Create Account</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="navbar">
+        <div class="logo">
+            <span class="icon">🍴</span>
+            <h1>Q-Sense</h1>
+        </div>
+        <nav>
+            <a href="index.html">Home</a>
+
+            
+            <div class="user-profile">
+                <a href="CustomerLogin.html" class="login-link">Sign In</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="login-container">
+        <div class="login-card">
+            <h2>Create an Account</h2>
+            <form id = "signup" method="post" action="CustomerLogin.html">
+                <div class="form-row">
+                    <div class="input-group">
+                        <input type="text" placeholder="Name" required>
+                    </div>
+                    
+                </div>
+                
+                <div class="input-group">
+                    <input type="email" placeholder="Email Address" required>
+                </div>
+                
+                <div class="input-group">
+                    <input type="tel" placeholder="Phone Number" required>
+                </div>
+
+                <div class="input-group">
+                    <input type="password" placeholder="Password" required>
+                </div>
+                
+                <div class="input-group">
+                    <input type="password" placeholder="Confirm Password" required>
+                </div>
+
+                <div class="action-row">
+                    <button type="submit" class="login-btn">Sign Up</button>
+                    <div class="links">
+                        <a href="CustomerLogin.html">Already have an account? Log In</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
+    </footer>
+
+    <script>
+   document.getElementById("signup").addEventListener("submit", async function(e){
+    e.preventDefault();
+
+    const name = document.querySelector('input[type="text"]').value;
+    const email = document.querySelector('input[type="email"]').value;
+    const phone = document.querySelector('input[type="tel"]').value; 
+    const password = document.querySelector('input[type="password"]').value;
+
+    try {
+        const res = await fetch("http://localhost:5000/api/users/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ name, email, phone, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            alert("Account created successfully! You can now log in.");
+            window.location.href = "CustomerLogin.html"; 
+        } else {
+            alert(data.message || "Registration failed. Please try again.");
+        }
+    } catch (error) {
+        console.error("Registration error:", error);
+        alert("A network error occurred. Is your server running?");
+    }
+});
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | My Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+     
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+        }
+
+        .profile-card, .dashboard-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: #3178c6;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .profile-details p {
+            margin: 10px 0;
+            color: #555;
+            font-size: 16px;
+        }
+
+        .action-buttons-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .dash-btn {
+            background: #f8f9fc;
+            border: 2px solid #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: #333;
+            display: block;
+        }
+
+        .dash-btn:hover {
+            border-color: #3178c6;
+            background: #f0f7ff;
+            transform: translateY(-2px);
+        }
+
+        .dash-btn h3 {
+            margin-bottom: 10px;
+            color: #3178c6;
+        }
+
+        .reservation-item {
+            border-left: 4px solid #3178c6;
+            background: #f8f9fc;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #777;
+            font-style: italic;
+            background: #f8f9fc;
+            border-radius: 8px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="navbar">
+        <div class="logo">
+            <span class="icon">🍴</span>
+            <h1>Q-Sense</h1>
+        </div>
+     <nav>
+    <a href="CustomerHome.html">Home</a>
+    <a href = "CustomerDashboard.html" style = "color: #3178c6; border-bottom: 2px solid #3178c6; padding-bottom: 5px;">Dashboard</a>
+    <a href="Locations.html">Locations</a>
+    <a href="CustomerReservation.html">Reservation</a>
+   
+    <a href="index.html" id="logout-btn" style="color: red; margin-left: 15px;">Logout</a>
+</nav>
+    </header>
+
+    <main class="dashboard-container">
+        <aside>
+            <div class="profile-card">
+                <div class="profile-avatar" id="user-initial">?</div>
+                <h2 id="user-name">Loading...</h2>
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+                <div class="profile-details">
+                    <p><strong>Email:</strong> <span id="user-email">...</span></p>
+                    <p><strong>Phone:</strong> <span id="user-phone">...</span></p>
+                    <p><strong>Status:</strong> <span style="color: green;">ONLINE</span></p>
+                </div>
+            </div>
+        </aside>
+
+        <section>
+            <div class="action-buttons-grid">
+                <a href="locations.html" class="dash-btn">
+                    <h3>Join Live Queue</h3>
+                    <p>Walk-in right now? Get in line virtually before you arrive through our dynamic map!</p>
+                </a>
+                <a href="CustomerReservation.html" class="dash-btn">
+                    <h3> Book a Table</h3>
+                    <p>Planning ahead? Secure your spot for a future date and time.</p>
+                </a>
+            </div>
+
+            <div class="dashboard-card">
+                <h2 style="margin-bottom: 20px;">Upcoming Reservations</h2>
+                
+                <div id="reservations-list">
+                    <div class="empty-state">Loading your schedule...</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
+    </footer>
+
+   <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+        const customerId = localStorage.getItem("customer_id");
+        const customerEmail = localStorage.getItem("email");
+        const customerPhone = localStorage.getItem("phone");
+
+       
+        if (!customerId || customerId === "undefined" || customerId === "null") {
+           
+            localStorage.removeItem("customer_id"); 
+            window.location.href = "CustomerLogin.html";
+            return;
+        }
+
+   
+        document.getElementById("logout-btn").addEventListener("click", (e) => {
+            e.preventDefault();
+            localStorage.clear();
+            window.location.href = "CustomerLogin.html";
+        });
+
+        try {
+         
+            const userRes = await fetch(`http://localhost:5000/api/users/${customerId}`);
+            
+          
+            if (!userRes.ok) {
+                localStorage.clear();
+                window.location.href = "CustomerLogin.html";
+                return;
+            }
+
+            const userData = await userRes.json();
+            
+            document.getElementById("user-name").textContent = userData.name;
+            document.getElementById("user-email").textContent = userData.email;
+            document.getElementById("user-phone").textContent = userData.phone;
+            document.getElementById("user-initial").textContent = userData.name.charAt(0).toUpperCase();
+
+            
+            const resList = document.getElementById("reservations-list");
+            const revRes = await fetch(`http://localhost:5000/api/reservations/user/${customerId}`);
+            
+            if(revRes.ok) {
+                const reservations = await revRes.json();
+ 
+                console.log("My Reservations Data:", reservations);
+
+                resList.innerHTML = ""; 
+
+                if (reservations.length === 0) {
+                    resList.innerHTML = `<div class="empty-state">You have no upcoming reservations.</div>`;
+                } else {
+                    reservations.forEach(res => {
+                        const item = document.createElement("div");
+                        item.className = "reservation-item";
+                        item.innerHTML = `
+                            <h3 style="margin-bottom: 5px;">${res.name}</h3>
+                            <p style="color: #555;"><strong>Date:</strong> ${res.date} &nbsp;|&nbsp; <strong>Time:</strong> ${res.time}</p>
+                            <p style="color: #555; margin-top: 5px;"><strong>Party Size:</strong> ${res.party_size} guests</p>
+                        `;
+                        resList.appendChild(item);
+                    });
+                }
+            } else {
+                resList.innerHTML = `<div class="empty-state">No reservations found.</div>`;
+            }
+
+        } catch (error) {
+            console.error("Dashboard error:", error);
+            
+            document.getElementById("reservations-list").innerHTML = 
+                `<div class="empty-state" style="color: red;">Failed to connect to server.</div>`;
+        }
+    });
+
+   
+   
+
+</script>
+</body>
+</html>

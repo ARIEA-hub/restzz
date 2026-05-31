@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense Admin | Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: #f4f7f9; display: flex; height: 100vh; overflow: hidden; }
+
+    
+        .sidebar { width: 280px; background: #fff; border-right: 1px solid #e1e8ed; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #e1e8ed; }
+        .sidebar-header h1 { color: #3178c6; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+        
+        .admin-profile { padding: 20px; border-bottom: 1px solid #e1e8ed; background: #f8fbff; }
+        .admin-profile h3 { font-size: 1.1rem; color: #333; word-wrap: break-word;}
+        .admin-profile p { font-size: 0.85rem; color: #666; margin-top: 5px; }
+        .badge { display: inline-block; background: #3178c6; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; margin-top: 8px; }
+
+        .nav-menu { padding: 15px 0; flex: 1; }
+        .nav-item { padding: 12px 20px; color: #555; text-decoration: none; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; font-weight: 500; }
+        .nav-item:hover { background: #f4f7f9; color: #3178c6; }
+        .nav-item.active { background: #eef5fb; color: #3178c6; border-right: 4px solid #3178c6; }
+        
+        .logout-btn { margin: 20px; padding: 10px; text-align: center; background: #fff; border: 1px solid #d9534f; color: #d9534f; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .logout-btn:hover { background: #d9534f; color: white; }
+
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .topbar { background: #fff; padding: 20px 30px; border-bottom: 1px solid #e1e8ed; display: flex; justify-content: space-between; align-items: center; }
+        .topbar h2 { color: #333; font-weight: 600; }
+        
+        .content-section { padding: 30px; display: none; } 
+        .content-section.active { display: block; } 
+
+        .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e1e8ed; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1><span>🍴</span> Q-Sense OS</h1>
+        </div>
+        
+        <div class="admin-profile">
+            <h3 id="admin-name">Loading...</h3>
+            <p id="admin-restaurant">Restaurant: Loading...</p>
+            <span class="badge" id="admin-role-badge">Store Manager</span>
+        </div>
+
+        <nav class="nav-menu">
+            <div class="nav-item active" onclick="switchTab('table-management', this)">
+                📊 Table Management
+            </div>
+            <div class="nav-item" onclick="switchTab('live-queue', this)">
+                🚶 Live Queue
+            </div>
+            <div class="nav-item" onclick="switchTab('hours', this)">
+                ⏱️ My Hours
+            </div>
+            <div class="nav-item" onclick="switchTab('contact', this)">
+                📞 Support / Contact
+            </div>
+        </nav>
+
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </aside>
+
+    <main class="main-content">
+        <header class="topbar">
+            <h2 id="page-title">Table Management</h2>
+            <div style="color: #666; font-size: 0.9rem;">Live System Status: <span style="color: #28a745; font-weight: bold;">Online</span></div>
+        </header>
+
+        <section id="table-management" class="content-section active">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="color: #3178c6; margin: 0;">Pending Reservations</h3>
+                    
+                    <button onclick="window.location.href='AdminTableManagement.html'" 
+                            style="background: #fff; border: 2px solid #3178c6; color: #3178c6; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s;"
+                            onmouseover="this.style.background='#3178c6'; this.style.color='#fff';"
+                            onmouseout="this.style.background='#fff'; this.style.color='#3178c6';">
+                        🗺️ View Floor Plan
+                    </button>
+                </div>
+                
+                <p style="color: #666; margin-bottom: 20px;">Assign incoming reservations to available tables.</p>
+                <div id="pending-reservations-list"></div>
+            </div>
+        </section>
+
+        <section id="live-queue" class="content-section">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="color: #3178c6; margin: 0;">Live Walk-in Queue</h3>
+                    <button onclick="loadLiveQueue(localStorage.getItem('restaurant_id'))" style="background: #fff; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer;">
+                        🔄 Refresh
+                    </button>
+                </div>
+                <p style="color: #666; margin-bottom: 20px;">Manage customers currently waiting for a table.</p>
+                
+                <div id="live-queue-list"></div>
+            </div>
+        </section>
+
+        <section id="hours" class="content-section">
+            <div class="card">
+                <h3 style="color: #3178c6; margin-bottom: 15px;">Timesheet & Hours</h3>
+                <p style="color: #666;">You have logged 32 hours this week.</p>
+            </div>
+        </section>
+
+        <section id="contact" class="content-section">
+            <div class="card">
+                <h3 style="color: #3178c6; margin-bottom: 15px;">IT Support & Contact</h3>
+                <p style="color: #666;">Need help? Contact the Q-Sense SuperAdmin team at support@qsense.com</p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+       
+        function switchTab(tabId, element) {
+            document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+            element.classList.add('active');
+            
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+
+            document.getElementById('page-title').innerText = element.innerText.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = "AdminLogin.html"; 
+        }
+
+
+        window.addEventListener("DOMContentLoaded", async () => {
+            const adminId = localStorage.getItem("admin_id");
+            const restaurantId = localStorage.getItem("restaurant_id");
+            const adminEmail = localStorage.getItem("admin_email");
+            const adminRole = localStorage.getItem("role") || "Store Manager";
+
+            if (!adminId || !restaurantId || restaurantId === "undefined") {
+                localStorage.clear();
+                window.location.href = "AdminLogin.html";
+                return;
+            }
+
+            document.getElementById("admin-name").textContent = adminEmail;
+            document.getElementById("admin-restaurant").textContent = `Restaurant ID: ${restaurantId}`;
+            document.getElementById("admin-role-badge").textContent = adminRole.charAt(0).toUpperCase() + adminRole.slice(1);
+
+            await loadPendingReservations(restaurantId);
+            await loadLiveQueue(restaurantId);
+        });
+
+
+        async function loadPendingReservations(restaurantId) {
+            const listContainer = document.getElementById("pending-reservations-list");
+            listContainer.innerHTML = "<p style='color: #666;'>Loading requests...</p>";
+
+            try {
+                const res = await fetch(`http://localhost:5000/api/admin/reservations/pending/${restaurantId}`);
+                const reservations = await res.json();
+
+                if (!res.ok) {
+                    listContainer.innerHTML = `<p style='color: #d9534f; font-weight: bold;'>Backend Error: ${reservations.message || "Check your Node terminal!"}</p>`;
+                    return;
+                }
+
+                if (!Array.isArray(reservations) || reservations.length === 0) {
+                    listContainer.innerHTML = `
+                        <div style="padding: 40px 20px; background: #eef5fb; border-radius: 8px; text-align: center; border: 1px dashed #b8d4f2;">
+                            <h3 style="color: #3178c6; margin-bottom: 10px;">🎉 All caught up!</h3>
+                            <p style="color: #666; margin-bottom: 20px;">There are no pending walk-ins or reservations waiting for a table.</p>
+                            <button onclick="window.location.href='AdminTableManagement.html'" 
+                                    style="background: #3178c6; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 6px rgba(49,120,198,0.2);">
+                                Go to Table Management ➡
+                            </button>
+                        </div>`;
+                    return;
+                }
+
+                listContainer.innerHTML = ""; 
+
+                reservations.forEach(req => {
+                    const card = document.createElement("div");
+                    card.style.cssText = "border: 1px solid #e1e8ed; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; background: #fafcff;";
+                    
+                    card.innerHTML = `
+                        <div>
+                            <h4 style="color: #3178c6; margin-bottom: 5px; font-size: 1.1rem;">👤 ${req.customer_name}</h4>
+                            <p style="font-size: 0.9rem; color: #555;">📞 ${req.phone} &nbsp;|&nbsp; 👥 <strong>${req.group_size} Guests</strong></p>
+                            <p style="font-size: 0.9rem; color: #555; margin-top: 5px;">📅 ${req.date} &nbsp;|&nbsp; ⏰ ${req.time}</p>
+                        </div>
+                        
+                        <div>
+                            <button onclick="window.location.href='AdminTableManagement.html?reserve_id=${req.reserve_id}&party_size=${req.group_size}'" 
+                                    style="background: #3178c6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;">
+                                ⚙️ Manage
+                            </button>
+                        </div>
+                    `;
+                    listContainer.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error("Error fetching reservations:", error);
+                listContainer.innerHTML = "<p style='color: #d9534f; font-weight: bold;'>Failed to load reservations. Check console.</p>";
+            }
+        }
+
+  
+        async function loadLiveQueue(restaurantId) {
+            const listContainer = document.getElementById("live-queue-list");
+            listContainer.innerHTML = "<p style='color: #666;'>Loading queue...</p>";
+
+            try {
+                const res = await fetch(`http://localhost:5000/api/queue/admin/${restaurantId}`);
+                const queue = await res.json();
+
+                if (!Array.isArray(queue) || queue.length === 0) {
+                    listContainer.innerHTML = `
+                        <div style="padding: 30px 20px; background: #f9fafb; border-radius: 8px; text-align: center; border: 1px dashed #ccc;">
+                            <p style="color: #666; font-weight: 500;">No one is currently in the walk-in queue.</p>
+                        </div>`;
+                    return;
+                }
+
+                listContainer.innerHTML = ""; 
+
+                queue.forEach((req, index) => {
+                    const joinTime = new Date(req.joined_at);
+                    const waitMinutes = Math.floor((new Date() - joinTime) / 60000);
+                    
+                    const isCalled = req.status === 'called';
+                    const highlightBorder = isCalled ? "border-left: 5px solid #ffc107;" : "border-left: 5px solid #3178c6;";
+
+                    const card = document.createElement("div");
+                    card.style.cssText = `border: 1px solid #e1e8ed; ${highlightBorder} padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; background: ${isCalled ? '#fffdf5' : '#fff'}; box-shadow: 0 2px 4px rgba(0,0,0,0.02);`;
+                    
+                    /* FIX 2: Fixed the broken template literal structure here */
+                    card.innerHTML = `
+                        <div>
+                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+                                <span style="background: #eef5fb; color: #3178c6; font-weight: bold; padding: 3px 8px; border-radius: 4px; font-size: 0.9rem;">#${index + 1}</span>
+                                <h4 style="color: #333; margin: 0; font-size: 1.1rem;">👤 ${req.customer_name}</h4>
+                                ${isCalled ? '<span style="background: #ffc107; color: #000; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: bold;">CALLED</span>' : ''}
+                            </div>
+                            <p style="font-size: 0.9rem; color: #555;">📞 ${req.phone} &nbsp;|&nbsp; 👥 <strong>${req.group_size} Guests</strong></p>
+                            <p class="wait-time-text" style="font-size: 0.85rem; color: ${waitMinutes > 20 ? '#d9534f' : '#666'}; margin-top: 5px; font-weight: 500;">
+                                ⏱️ Waiting for <span class="live-timer" data-joined="${req.joined_at}">${waitMinutes}</span> mins
+                            </p>
+                        </div>
+                        
+                        <div style="display: flex; gap: 8px;">
+                            ${!isCalled ? 
+                                `<button onclick="updateQueueStatus(${req.queue_id}, 'called')" style="background: #f0ad4e; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">🔔 Call</button>` 
+                                : ''}
+                            <button onclick="updateQueueStatus(${req.queue_id}, 'seated')" style="background: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">✅ Seated</button>
+                            <button onclick="updateQueueStatus(${req.queue_id}, 'cancelled')" style="background: #d9534f; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">❌ Cancel</button>
+                        </div>
+                    `;
+                    listContainer.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error("Error loading queue:", error);
+                listContainer.innerHTML = "<p style='color: #d9534f;'>Failed to load queue.</p>";
+            }
+        }
+
+        async function updateQueueStatus(queueId, newStatus) {
+            try {
+                const res = await fetch(`http://localhost:5000/api/queue/update/${queueId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (res.ok) {
+                    loadLiveQueue(localStorage.getItem('restaurant_id'));
+                } else {
+                    alert("Failed to update status.");
+                }
+            } catch (error) {
+                console.error("Error updating status:", error);
+            }
+        }
+
+     
+        setInterval(() => {
+            document.querySelectorAll('.live-timer').forEach(span => {
+                const joinTime = new Date(span.getAttribute('data-joined'));
+                const waitMinutes = Math.floor((new Date() - joinTime) / 60000);
+                
+                span.textContent = waitMinutes;
+                
+                if (waitMinutes > 20) {
+                    span.closest('.wait-time-text').style.color = '#d9534f';
+                }
+            });
+        }, 30000); 
+    </script>
+</body>
+</html>

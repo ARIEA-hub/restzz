@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | Login</title>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header class="navbar">
+        <div class="logo">
+            <span class="icon">🍴</span>
+            <h1>Q-Sense</h1>
+        </div>
+        <nav>
+            <a href="index.html">Dashboard</a>
+            <a href="AdminTableManagement.html">Tables</a>
+            
+            <div class="admin-profile">
+                <div class="avatar"></div>
+                <span>Restaurant Admin</span>
+            </div>
+        </nav>
+    </header>
+
+    <main class="login-container">
+        <div class="login-card">
+            <h2>Welcome to Q-Sense</h2>
+            <form id = "adminLogin">
+                <div class="input-group">
+                    <input type="email" placeholder="Email" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" placeholder="Password" required>
+                </div>
+                <div class="action-row">
+                    <button type="submit" class="login-btn">Log In</button>
+                    <div class="links">
+                        <a href="#">Forgot Password?</a>
+                        <a href="AdminSignUp.html">Create Account</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
+    </footer>
+
+    <script>
+    
+    document.getElementById("adminLogin").addEventListener("submit", async function(e){
+        e.preventDefault();
+
+        const email = document.querySelector('input[type="email"]').value;
+        const password = document.querySelector('input[type="password"]').value;
+
+        try {
+            const res = await fetch("http://localhost:5000/api/admin/login",{
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({email, password})
+            });
+
+            const data = await res.json();
+
+            if(res.ok){
+   
+    localStorage.setItem("temp_admin_id", data.admin_id);
+    localStorage.setItem("temp_restaurant_id", data.restaurant_id); 
+    localStorage.setItem("temp_email", email); 
+    localStorage.setItem("temp_role", data.role); 
+    localStorage.setItem("temp_name", name);
+
+    console.log("Password correct! Requesting OTP...");
+    
+    
+    const otpRes = await fetch("http://localhost:5000/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        
+        body: JSON.stringify({ email: email, role: data.role }) 
+    });
+
+    const otpData = await otpRes.json();
+
+    if (otpData.success) {
+       
+        window.location.href = "OtpVerification.html";
+    } else {
+        alert("Failed to send OTP email. Please try again.");
+    }
+
+} else {
+    alert(data.message);
+}
+        } catch (error) {
+            console.error("Login error:", error);
+            alert("An error occurred while trying to log in.");
+        }
+    });
+</script>
+
+
+</body>
+</html>

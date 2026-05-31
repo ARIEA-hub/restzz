@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | Home</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: #f4f7f9; color: #333; }
+
+   
+        .navbar {
+            background: white;
+            padding: 15px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e1e8ed;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo { font-size: 1.5rem; font-weight: 800; color: #3178c6; display: flex; align-items: center; gap: 8px; }
+        .nav-links a { margin-left: 25px; text-decoration: none; color: #555; font-weight: 500; transition: 0.2s; }
+        .nav-links a:hover { color: #3178c6; }
+        .logout-btn { color: #d9534f !important; }
+
+        
+        .app-container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
+
+  
+        .greeting-section { margin-bottom: 40px; animation: fadeInDown 0.8s ease-out; }
+        .greeting-title { font-size: 2.8rem; font-weight: 800; color: #1a1a1a; letter-spacing: -1px; }
+        .greeting-subtitle { font-size: 1.1rem; color: #666; margin-top: 8px; }
+
+  
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #e1e8ed;
+            padding-bottom: 10px;
+        }
+        .section-header h2 { font-size: 1.5rem; color: #333; }
+        .view-all { color: #3178c6; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+
+     
+        .locations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .restaurant-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 1px solid #e1e8ed;
+            display: flex;
+            flex-direction: column;
+        }
+        .restaurant-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 25px rgba(0,0,0,0.1);
+            border-color: #b8d4f2;
+        }
+
+        .card-image {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-bottom: 1px solid #eee;
+        }
+
+        .card-content { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+        .card-content h3 { font-size: 1.25rem; color: #1a1a1a; margin-bottom: 5px; }
+        .card-content p { color: #666; font-size: 0.9rem; margin-bottom: 15px; }
+        
+        .badges { display: flex; gap: 8px; margin-bottom: 20px; }
+        .badge { background: #eef5fb; color: #3178c6; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; }
+        .badge.queue { background: #fff3cd; color: #856404; }
+
+        .card-actions { display: flex; gap: 10px; margin-top: auto; }
+        .btn {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+        .btn-primary { background: #3178c6; color: white; border: 1px solid #3178c6; }
+        .btn-primary:hover { background: #255a96; }
+        .btn-secondary { background: white; color: #3178c6; border: 1px solid #3178c6; }
+        .btn-secondary:hover { background: #eef5fb; }
+
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">🍴 Q-Sense</div>
+        <div class="nav-links">
+            <a href="CustomerDashboard.html">Dashboard</a>
+            <a href = "locations.html">Locations</a>
+            <a href="index.html" class="logout-btn" onclick="logoutCustomer()">Logout</a>
+        </div>
+    </nav>
+
+    <main class="app-container">
+        
+        <section class="greeting-section">
+            <h1 class="greeting-title" id="user-greeting">Hi there. Let's get started.</h1>
+            <p class="greeting-subtitle">Find a table, join a live waitlist, and skip the line.</p>
+        </section>
+
+        <div class="section-header">
+            <h2>Explore Most Popular Locations</h2>
+            <a href="#" class="view-all"></a>
+        </div>
+
+        <section class="locations-grid" id="locations-container">
+            </section>
+
+    </main>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const customerId = localStorage.getItem('customer_id');
+            let customerName = localStorage.getItem('customer_name') || localStorage.getItem('customer_email');
+
+              if (!customerId) {
+                window.location.href = "index.html"; 
+                return;
+            }
+
+        
+            if (customerName) {
+                const firstName = customerName.split(' ')[0].split('@')[0]; 
+                document.getElementById('user-greeting').textContent = `Hi ${firstName}. Let's get started.`;
+            }
+
+            loadPopularLocations();
+        });
+
+     
+      async function loadPopularLocations() {
+            const container = document.getElementById('locations-container');
+            container.innerHTML = "<p style='padding: 20px; color: #666;'>Loading popular locations...</p>";
+            
+            try {
+               
+                const res = await fetch('http://localhost:5000/api/restaurants');
+                const restaurants = await res.json();
+
+                if (!res.ok) throw new Error("Failed to fetch");
+
+                container.innerHTML = ""; 
+
+    
+                restaurants.forEach(rest => {
+                    const card = document.createElement('div');
+                    card.className = 'restaurant-card';
+                    
+                   
+                    const imgUrl = rest.image_url || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80";
+                    const subtitle = rest.location || "Premium Dining"; 
+
+                    
+                    card.innerHTML = `
+                        <img src="${imgUrl}" alt="${rest.name}" class="card-image">
+                        <div class="card-content">
+                            <h3>${rest.name}</h3>
+                            <p>${subtitle}</p>
+                            
+                            <div class="badges">
+                                <span class="badge">📅 Reservations</span>
+                                <span class="badge queue">🚶 Live Queue</span>
+                            </div>
+                            
+                            <div class="card-actions">
+                                <a href="CustomerReservation.html?restaurant_id=${rest.restaurant_id}" class="btn btn-primary">Book Table</a>
+                                <a href="JoinQueue.html?restaurant_id=${rest.restaurant_id}" class="btn btn-secondary">Join Line</a>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error("Error loading restaurants:", error);
+                container.innerHTML = "<p style='color: #d9534f; padding: 20px;'>Failed to load locations. Is your server running?</p>";
+            }
+        }
+
+        function logoutCustomer() {
+            localStorage.removeItem('customer_id');
+            localStorage.removeItem('customer_name');
+            localStorage.removeItem('customer_email');
+            window.location.href = "index.html"; 
+        }
+    </script>
+</body>
+</html>

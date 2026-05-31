@@ -4,25 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Q-Sense | Book a Table</title>
+         <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<script>
-    const API_URL = "http://127.0.0.1:8000";
-</script>
 <body>
 
     <header class="navbar">
         <div class="logo">
             <span class="icon">🍴</span>
             <h1>Q-Sense</h1>
+</a>
         </div>
         <nav>
-            <a href="#">Home</a>
-            
+            <a href="CustomerHome.html">Home</a>
+            <a href="CustomerDashboard.html">Dashboard</a>
             <a href="locations.html">Locations</a>
             <a href="#" style="color: #3178c6; border-bottom: 2px solid #3178c6; padding-bottom: 5px;">Reservations</a>
             <div class="user-profile">
-                <a href="#" class="login-link">Sign In</a>
+                <a id = "auth" href="CustomerLogin.html" class="login-link">Sign In</a>
             </div>
         </nav>
     </header>
@@ -34,22 +35,22 @@
                 <p>Reserve your spot at any of our Q-Sense locations.</p>
             </div>
 
-            <form id="customerReservationForm">
+            <form id = "reserveForm">
                 <div class="search-criteria">
                     <div class="input-group">
                         <label>Location</label>
-                        <select required>
+                        <select id = "restaurantSelect" required>
                             <option value="">Select a restaurant...</option>
-                            <option value="downtown">Q-Sense Downtown</option>
-                            <option value="uptown">Q-Sense Uptown</option>
-                            <option value="bayarea">Q-Sense Bay Area</option>
+                            <option value="1">Q-Sense Downtown</option>
+                            <option value="2">Q-Sense Uptown</option>
+                            <option value="3">Q-Sense Bay Area</option>
                         </select>
                     </div>
                     
                     <div class="form-row">
                         <div class="input-group">
                             <label>Party Size</label>
-                            <select required>
+                            <select id = "groupSize" required>
                                 <option value="2">2 People</option>
                                 <option value="3">3 People</option>
                                 <option value="4">4 People</option>
@@ -60,7 +61,7 @@
                         </div>
                         <div class="input-group">
                             <label>Date</label>
-                            <input type="date" required>
+                            <input type="date"  id = "reserveDate" required>
                         </div>
                     </div>
                 </div>
@@ -68,42 +69,23 @@
                 <div class="time-selection">
                     <label>Available Times</label>
                     <div class="time-slots">
-                        <label class="time-slot">
-                            <input type="radio" name="time" value="18:00" required>
-                            <span>6:00 PM</span>
-                        </label>
-                        <label class="time-slot">
-                            <input type="radio" name="time" value="18:30">
-                            <span>6:30 PM</span>
-                        </label>
-                        <label class="time-slot">
-                            <input type="radio" name="time" value="19:00">
-                            <span>7:00 PM</span>
-                        </label>
-                        <label class="time-slot">
-                            <input type="radio" name="time" value="19:30" disabled>
-                            <span class="booked">7:30 PM</span>
-                        </label>
-                        <label class="time-slot">
-                            <input type="radio" name="time" value="20:00">
-                            <span>8:00 PM</span>
-                        </label>
-                        <label class="time-slot">
-                            <input type="radio" name="time" value="20:30">
-                            <span>8:30 PM</span>
-                        </label>
+                        <select id = "reserveTime">
+                            <option value = '18:00:00'>6 PM</option>
+                            <option value = '18:30:00'>6:30 PM</option>
+                             <option value = '19:00:00'>7 PM</option>
+                             <option value = '19:30:00'>7:30 PM</option>
+                              <option value = '20:00:00'>8 PM</option>
+                        </select>
                     </div>
                 </div>
 
                 <div class="guest-details">
-                    <label>Your Details</label>
+                    <label style = "margin-bottom: 5px;">Your Details</label>
                     <div class="form-row">
                         <div class="input-group">
-                            <input type="text" placeholder="First Name" required>
+                            <input type="text" placeholder="Name" required>
                         </div>
-                        <div class="input-group">
-                            <input type="text" placeholder="Last Name" required>
-                        </div>
+                       
                     </div>
                     <div class="form-row">
                         <div class="input-group">
@@ -126,6 +108,110 @@
     <footer class="footer">
         <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
     </footer>
+
+  
+ <script>
+window.addEventListener("DOMContentLoaded", async () => {
+  
+    const userId = localStorage.getItem("customer_id");
+    if(!userId) return;
+
+    try {
+        const res = await fetch(`http://localhost:5000/api/users/${userId}`);
+        const data = await res.json();
+        const link = document.getElementById("auth");
+        link.textContent = data.name;
+        link.href = "#";
+        
+        link.onclick = () => {
+            localStorage.removeItem("customer_id");
+            location.reload();
+        };
+    } catch(err) {
+        console.error("Auth Error:", err);
+    }
+
+    // 2. HANDLING THE RESERVATION SUBMISSION
+    const form = document.getElementById("reserveForm");
+    
+    if (form) {
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault(); // Stop the page from reloading
+
+            // Grab the data the user selected
+            const restaurant_id = document.getElementById("restaurantSelect").value;
+            const group_size = document.getElementById("groupSize").value;
+            const reserve_date = document.getElementById("reserveDate").value;
+            const reserve_time = document.getElementById("reserveTime").value;
+
+            try {
+                
+                const res = await fetch("http://localhost:5000/api/reservations/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        customer_id: userId,
+                        restaurant_id: restaurant_id,
+                        group_size: group_size,
+                        reserve_date: reserve_date,
+                        reserve_time: reserve_time
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                   
+                    window.location.href = "CustomerDashboard.html";
+                } else {
+                    alert(data.message || "Failed to book table.");
+                }
+            } catch (error) {
+                console.error("Booking Error:", error);
+                alert("A network error occurred. Is your backend running?");
+            }
+        });
+    }
+
+
+    
+const locationDropdown = document.getElementById("restaurantSelect");
+
+async function loadRestaurants() {
+    try {
+        const res = await fetch("http://localhost:5000/api/restaurant");
+        const restaurants = await res.json();
+
+        
+        locationDropdown.innerHTML = '<option value="">Select a restaurant...</option>';
+
+       
+        restaurants.forEach(rest => {
+            const option = document.createElement("option");
+            option.value = rest.restaurant_id;
+            option.textContent = rest.name;    
+            locationDropdown.appendChild(option);
+        });
+
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const passedRestaurantId = urlParams.get('restaurant_id');
+        
+        if (passedRestaurantId) {
+            locationDropdown.value = passedRestaurantId;
+        }
+
+    } catch (error) {
+        console.error("Failed to load restaurant list:", error);
+    }
+}
+
+
+loadRestaurants();
+
+
+});
+</script>
 
 </body>
 </html>

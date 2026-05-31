@@ -2,7 +2,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Inter',-apple-system, BlinkMacSystemFont, 'Inter', Roboto, Oxygen, Ubuntu, Cantarell;
 }
 
 body {
@@ -12,7 +12,6 @@ body {
     height: 100vh;
 }
 
-/* Navbar */
 .navbar {
     background: white;
     padding: 1rem 5%;
@@ -53,6 +52,14 @@ nav a {
     padding-left: 20px;
 }
 
+.admin-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-left: 1px solid #ddd;
+    padding-left: 20px;
+}
+
 .avatar {
     width: 30px;
     height: 30px;
@@ -82,7 +89,8 @@ nav a {
 }
 
 .input-group {
-    margin-bottom: 1rem;
+    margin-top: 10px;
+    margin-bottom: 5px;
 }
 
 input {
@@ -468,4 +476,147 @@ select, textarea {
     color: #3178c6;
     font-weight: 600;
     text-decoration: none;
+}
+
+/* 1. Base shape for all table cards */
+.table-item {
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100px;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.table-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+}
+
+/* 2. The Color Coding Logic */
+
+/* VACANT (Available) -> Green */
+.table-vacant {
+    background-color: #e6f4ea; 
+    border: 2px solid #28a745 !important;
+    color: #155724;
+}
+
+/* OCCUPIED -> Red */
+.table-occupied {
+    background-color: #fce8e6; 
+    border: 2px solid #dc3545 !important;
+    color: #721c24;
+}
+
+/* RESERVED -> Yellow */
+.table-reserved {
+    background-color: #fff3cd; 
+    border: 2px solid #ffc107 !important;
+    color: #856404;
+}
+
+/* UNAVAILABLE -> Purple */
+.table-unavailable {
+    background-color: #f3e5f5; 
+    border: 2px solid #9c27b0 !important;
+    color: #4b2885;
+}
+
+
+/* --- COMPACT RESERVATION FORM STYLING --- */
+
+/* 1. Shrink the main white card's padding */
+.reservation-card { 
+    padding: 20px 40px !important; 
+    margin: 2vh auto !important; /* Keeps it vertically centered but snug */
+}
+
+/* 2. Tighten the space around the main title */
+.reservation-header {
+    margin-bottom: 15px !important;
+}
+.reservation-header h2 {
+    margin-bottom: 5px !important;
+    font-size: 1.8rem !important;
+}
+.reservation-header p {
+    margin-bottom: 0 !important;
+    font-size: 0.9rem !important;
+}
+
+/* 3. Reduce the gap between each row of inputs */
+.form-group {
+    margin-bottom: 12px !important; 
+}
+
+/* 4. Make the input boxes slightly thinner */
+.form-control, 
+select, 
+input[type="text"], 
+input[type="email"], 
+input[type="date"] {
+    padding: 8px 12px !important; /* Reduces vertical height of the boxes */
+    font-size: 0.95rem !important;
+}
+
+/* 5. Make labels a bit more compact */
+label {
+    margin-bottom: 4px !important;
+    font-size: 0.85rem !important;
+}
+
+/* --- RESERVATION TABS STYLING --- */
+.res-tabs {
+    display: flex;
+    gap: 20px;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 10px 5px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #718096; /* Grey text for inactive */
+    cursor: pointer;
+    position: relative;
+    transition: color 0.3s ease;
+}
+
+
+.tab-btn.active {
+    color: #3182ce; 
+}
+.tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: #3182ce;
+    border-radius: 3px 3px 0 0;
+}
+
+/* Hide inactive panes */
+.res-pane {
+    display: none;
+}
+.res-pane.active-pane {
+    display: block;
+}
+
+/* Optional: Make completed/cancelled cards look slightly faded */
+#pane-completed .reservation-card, 
+#pane-cancelled .reservation-card {
+    opacity: 0.8;
+    border-left-color: #cbd5e0; /* Grey side-stripe instead of blue */
 }

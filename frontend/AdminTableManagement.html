@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Sense | Table Reservations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>     
+<body>
+
+    <header class="navbar">
+        <div class="logo">
+            <span class="icon">🍴</span>
+            <h1>Q-Sense</h1>
+        </div>
+        <nav>
+            <a href="AdminDashboard.html">Dashboard</a>
+     
+            <a href="#" style="color: #3178c6; border-bottom: 2px solid #3178c6; padding-bottom: 5px;">Tables</a>
+           
+            <div class="user-profile">
+                <a id="adminAuth" href="AdminLogin.html" style="color: #3178c6; font-weight: 600; text-decoration: none;">Log In</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="reservation-container" id="main-container">
+        
+        <div class="stats-row">
+            <div class="stat-card">
+                <h3>Total Tables</h3>
+                <p class="stat-number" id="stat-total">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Vacant</h3>
+                <p class="stat-number vacant-text" id="stat-vacant">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Occupied / Reserved</h3>
+                <p class="stat-number occupied-text" id="stat-occupied">0</p>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Select Table</label>
+            <select id="update-table-select" required>
+                <option value="">Loading tables...</option>
+            </select>
+        </div>
+
+        <div class="tables-grid" id="floor-plan-grid">
+            </div>
+        
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
+    </footer>
+
+    <script>
+       
+        const urlParams = new URLSearchParams(window.location.search);
+        const reserveId = urlParams.get('reserve_id');
+        const partySize = urlParams.get('party_size');
+
+        window.addEventListener("DOMContentLoaded", async () => {
+            const adminId = localStorage.getItem("admin_id");
+            const restaurantId = localStorage.getItem("restaurant_id");
+
+            // Kick out unauthenticated users
+            if(!adminId || !restaurantId) {
+                window.location.href = "AdminLogin.html";
+                return;
+            }
+
+            if (reserveId) {
+                const mainContainer = document.getElementById("main-container");
+                const allocationBanner = document.createElement("div");
+                allocationBanner.style.cssText = "background: #eef5fb; border: 1px solid #3178c6; border-radius: 8px; padding: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center;";
+                allocationBanner.innerHTML = `
+                    <div>
+                        <h3 style="color: #3178c6; margin: 0; font-size: 1.2rem;">🎯 Table Allocation Mode</h3>
+                        <p style="color: #555; margin: 5px 0 0 0; font-size: 0.95rem;">Please select a vacant table below for <strong>Reservation #${reserveId}</strong> (Party of ${partySize}).</p>
+                    </div>
+                    <button id="final-assign-btn" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; cursor: not-allowed; opacity: 0.5; font-size: 1rem; transition: 0.2s;" disabled>
+                        Select a Vacant Table
+                    </button>
+                `;
+                mainContainer.insertBefore(allocationBanner, mainContainer.firstChild);
+            }
+
+            try {
+                // Fetch Admin Profile
+                const adminRes = await fetch(`http://localhost:5000/api/admin/${adminId}`);
+                if (adminRes.ok) {
+                    const adminData = await adminRes.json();
+                    const link = document.getElementById("adminAuth");
+                    link.textContent = `Logout (${adminData.name})`;
+                    link.style.color = "#d9534f"; 
+                    link.onclick = (e) => {
+                        e.preventDefault();
+                        localStorage.clear();
+                        window.location.href = "AdminLogin.html";
+                    };
+                }
+
+               
+                const tablesRes = await fetch(`http://localhost:5000/api/tables/restaurant/${restaurantId}`);
+                const tables = await tablesRes.json();
+
+                document.getElementById("stat-total").textContent = tables.length;
+                document.getElementById("stat-vacant").textContent = tables.filter(t => t.status === 'vacant').length;
+                document.getElementById("stat-occupied").textContent = tables.filter(t => t.status === 'occupied' || t.status === 'reserved').length;
+
+                const grid = document.getElementById("floor-plan-grid");
+                const selectDropdown = document.getElementById("update-table-select");
+                
+                grid.innerHTML = ""; 
+                selectDropdown.innerHTML = '<option value="">Choose a table...</option>';
+
+               
+                tables.forEach(table => {
+                  
+                    const option = document.createElement("option");
+                    option.value = table.table_id;
+                    option.textContent = `T${table.table_no} (${table.capacity} Seats) - ${table.status}`;
+                    selectDropdown.appendChild(option);
+
+                    
+                    const tableDiv = document.createElement("div");
+                    tableDiv.className = `table-item table-${table.status}`; 
+                    tableDiv.style.border = "3px solid transparent"; 
+                    tableDiv.style.cursor = "pointer";
+                    tableDiv.innerHTML = `<strong style="font-size: 1.2rem;">T${table.table_no}</strong><br><span style="font-size: 0.85rem;">${table.capacity} Seats</span>`;
+                    
+                  
+                    tableDiv.onclick = () => {
+                     
+                        selectDropdown.value = table.table_id;
+                        
+                       
+                        document.querySelectorAll('.table-item').forEach(el => el.style.borderColor = 'transparent');
+                        tableDiv.style.borderColor = "#3178c6";
+
+                        if (reserveId) {
+                            const btn = document.getElementById("final-assign-btn");
+                            if (table.status === 'vacant') {
+                                btn.disabled = false;
+                                btn.style.opacity = "1";
+                                btn.style.cursor = "pointer";
+                                btn.textContent = `✅ Assign T${table.table_no} to Reservation #${reserveId}`;
+                                
+                                btn.onclick = () => executeAllocation(reserveId, table.table_id);
+                            } else {
+                                btn.disabled = true;
+                                btn.style.opacity = "0.5";
+                                btn.style.cursor = "not-allowed";
+                                btn.textContent = `Table T${table.table_no} is not vacant`;
+                            }
+                        }
+                    };
+
+                    grid.appendChild(tableDiv);
+                });
+
+            } catch(err) {
+                console.error("Dashboard error:", err);
+            }
+        });
+
+        async function executeAllocation(reservationId, tableId) {
+            try {
+                    const res = await fetch(`http://localhost:5000/api/admin/reservations/${reservationId}/allocate`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table_id: tableId })
+                });
+
+                if (res.ok) {
+                    alert("Table successfully allocated!.");
+                    window.location.href = "AdminDashboard.html";
+                } else {
+                    alert("Failed to allocate table. It may be possible that a server side error has occured.");
+                }
+            } catch (error) {
+                console.error("Allocation Error:", error);
+                alert("Network error occurred while allocating.");
+            }
+        }
+    </script>
+</body>
+</html>
