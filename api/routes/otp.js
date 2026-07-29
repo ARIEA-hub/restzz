@@ -2,9 +2,7 @@ const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
 
-
 let otpStore = {}; 
-
 
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -19,7 +17,6 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-
 router.post('/send-otp', (req, res) => {
     const { email, role } = req.body; 
     
@@ -28,7 +25,6 @@ router.post('/send-otp', (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000);
-    
     
     otpStore[email] = { otp: otp, role: role }; 
 
@@ -51,16 +47,12 @@ router.post('/send-otp', (req, res) => {
     });
 });
 
-
 router.post('/verify-otp', (req, res) => {
     const { email, otp, role } = req.body;
 
-
     if (otpStore[email] && otpStore[email].otp == otp && otpStore[email].role === role) {
         
-       
         delete otpStore[email]; 
-
         
         const targetDashboard = role === 'admin' ? 'AdminTableManagement.html' : 'CustomerReservation.html';
 

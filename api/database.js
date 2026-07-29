@@ -1,10 +1,13 @@
-const mysql = require('mysql2');
-const pool = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
+const { Pool } = require('pg');
 
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Required for secure cloud connections
+    }
 });
 
-module.exports = pool.promise();
+// Wrapper to match your existing pool promise execution behavior
+module.exports = {
+    query: (text, params) => pool.query(text, params)
+};

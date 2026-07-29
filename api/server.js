@@ -19,7 +19,8 @@ app.get('/', (req, res) => {
 
 app.get('/test-db', async(req,res) => { 
     try{
-        const [rows] = await db.query('SELECT 1'); 
+        // FIX: Removed array destructuring [rows] since pg returns a result object
+        await db.query('SELECT 1'); 
         res.json({message: 'Database Connected Successfully.'});
     }
     catch(error){
@@ -51,8 +52,9 @@ app.use('/api/queue', queueRoutes);
 
 app.get('/api/restaurants', async (req, res) => {
     try {
-        const [restaurants] = await db.query("SELECT * FROM restaurant");
-        res.json(restaurants);
+        // FIX: Replaced [restaurants] destructuring with result object extraction
+        const result = await db.query("SELECT * FROM restaurant");
+        res.json(result.rows);
     } catch (error) {
         console.error("Error fetching restaurants:", error);
         res.status(500).json({ message: "Failed to load restaurants." });

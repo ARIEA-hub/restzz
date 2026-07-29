@@ -20,16 +20,16 @@ router.post('/register', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
 
-     
-        const [result] = await db.query(
+        // FIX: Changed placeholders to $1-$6 and added RETURNING statement to get the generated ID
+        const result = await db.query(
             `INSERT INTO admin (restaurant_id, name, email, phone, password, role)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING admin_id`,
             [restaurant_id, name, email, phone, hashedPassword, role || 'staff']
         );
 
         res.json({
             message: "Admin registered successfully!",
-            admin_id: result.insertId
+            admin_id: result.rows[0].admin_id // FIX: Extracted ID using PostgreSQL rows return structure
         });
 
     } catch (error) {
@@ -42,10 +42,12 @@ router.post('/login', async (req,res)=>{
     const {email, password} = req.body;
 
     try {
-        const [rows] = await db.query(
-            "SELECT * FROM admin WHERE email = ?",
+        // FIX: Changed to $1 placeholder and extracted .rows
+        const result = await db.query(
+            "SELECT * FROM admin WHERE email = $1",
             [email]
         );
+        const rows = result.rows;
 
         if(rows.length === 0){
             return res.status(401).json({message:"Invalid credentials"}); //no entry in the database
@@ -75,11 +77,12 @@ router.get('/:id', async (req,res)=>{
     const id = req.params.id;
 
     try {
-   
-        const [rows] = await db.query(
-            "SELECT name, email, phone, role, restaurant_id FROM admin WHERE admin_id = ?",
+        // FIX: Changed to $1 placeholder and extracted .rows
+        const result = await db.query(
+            "SELECT name, email, phone, role, restaurant_id FROM admin WHERE admin_id = $1",
             [id]
         );
+        const rows = result.rows;
 
         if(rows.length === 0){
             return res.status(404).json({message:"Admin not found"});
@@ -99,24 +102,25 @@ router.get('/reservations/pending/:restaurantId', async (req, res) => {
     const restaurantId = req.params.restaurantId;
 
     try {
+        // FIX: Changed MySQL DATE_FORMAT/TIME_FORMAT to PostgreSQL TO_CHAR and changed placeholders to $1, $2
         const query = `
             SELECT 
                 r.reserve_id, 
                 u.name AS customer_name, 
                 u.phone,
                 r.group_size, 
-                DATE_FORMAT(r.reserve_date, '%M %d, %Y') AS date, 
-                TIME_FORMAT(r.reserve_time, '%h:%i %p') AS time
+                TO_CHAR(r.reserve_date, 'Month DD, YYYY') AS date, 
+                TO_CHAR(r.reserve_time, 'HH12:MI AM') AS time
             FROM reservation r
             JOIN customer u ON r.customer_id = u.customer_id
-            WHERE r.restaurant_id = ? 
+            WHERE r.restaurant_id = $1 
             AND r.status = 'reserved' 
             AND r.table_id IS NULL
             ORDER BY r.reserve_date ASC, r.reserve_time ASC
         `;
         
-        const [pendingRequests] = await db.query(query, [restaurantId]);
-        res.json(pendingRequests);
+        const result = await db.query(query, [restaurantId]);
+        res.json(result.rows); // FIX: Send rows array directly
     } catch (error) {
         console.error("Error fetching pending reservations:", error);
         res.status(500).json({ message: "Failed to fetch reservations." });
@@ -134,23 +138,25 @@ router.put('/reservations/:reserveId/allocate', async (req, res) => {
     try {
         await db.query('BEGIN');
 
-       
-        await db.query(`UPDATE reservation SET table_id = ? WHERE reserve_id = ?`, [table_id, reserveId]);
+        // FIX: Placeholders changed to $1, $2
+        await db.query(`UPDATE reservation SET table_id = $1 WHERE reserve_id = $2`, [table_id, reserveId]);
 
-      
-        await db.query(`UPDATE restaurant_tables SET status = 'reserved' WHERE table_id = ?`, [table_id]);
+        // FIX: Placeholder changed to $1
+        await db.query(`UPDATE restaurant_tables SET status = 'reserved' WHERE table_id = $1`, [table_id]);
 
         await db.query('COMMIT'); 
 
         
-  
-        const [customerInfo] = await db.query(`
+        // FIX: Placeholder changed to $1
+        const result = await db.query(`
             SELECT c.email, c.name, r.reserve_date, r.reserve_time, t.table_no
             FROM reservation r
             JOIN customer c ON r.customer_id = c.customer_id
             JOIN restaurant_tables t ON r.table_id = t.table_id
-            WHERE r.reserve_id = ?
+            WHERE r.reserve_id = $1
         `, [reserveId]);
+        
+        const customerInfo = result.rows;
 
         // If we found the customer, send the email!
         if (customerInfo.length > 0) {

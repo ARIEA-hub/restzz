@@ -6,11 +6,12 @@ router.get('/restaurant/:id', async (req, res) => {
     const restaurantId = req.params.id;
 
     try {
-        const [tables] = await db.query(
-            "SELECT * FROM restaurant_tables WHERE restaurant_id = ?",
+        // FIX: Changed placeholder to $1 and removed array destructuring
+        const result = await db.query(
+            "SELECT * FROM restaurant_tables WHERE restaurant_id = $1",
             [restaurantId]
         );
-        res.json(tables);
+        res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

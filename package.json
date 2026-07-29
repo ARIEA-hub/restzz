@@ -5,7 +5,7 @@
   "main": "api/server.js",
   "scripts": {
     "dev": "nodemon api/server.js",
-    "start": "node api/server.js", 
+    "start": "node api/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -18,8 +18,8 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mysql2": "^3.18.2",
-    "nodemailer": "^8.0.2"
+    "nodemailer": "^8.0.2",
+    "pg": "^8.22.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
