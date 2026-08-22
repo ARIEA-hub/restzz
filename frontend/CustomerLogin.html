@@ -4,14 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Q-Sense | Login</title>
-       <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
-
-
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    </head>
+</head>
 <body>
 
     <header class="navbar">
@@ -21,8 +18,6 @@
         </div>
         <nav>
             <a href="index.html">Home</a>
-          
-            
             <div class="user-profile">
                 <div class="avatar"></div>
                 <span>Guest</span>
@@ -33,18 +28,20 @@
     <main class="login-container">
         <div class="login-card">
             <h2>Welcome to Q-Sense</h2>
-            <form id = "login">
+
+            <!-- FLOW D: Login is now purely email + password. No OTP step. -->
+            <form id="login">
                 <div class="input-group">
-                    <input type="email" placeholder="Email" required>
+                    <input type="email" id="email" placeholder="Email" required>
                 </div>
                 <div class="input-group">
-                    <input type="password" placeholder="Password" required>
+                    <input type="password" id="password" placeholder="Password" required>
                 </div>
                 <div class="action-row">
-                    <button type="submit" class="login-btn" style = "font-size: 10px;"><b>Log In</b></button>
+                    <button type="submit" id="loginBtn" class="login-btn">Log In</button>
                     <div class="links">
                         <a href="#">Forgot Password?</a>
-                        <a href="CustomerSignUp.html">Don't have an account? Sign Up instead</a>
+                        <a href="CustomerSignUp.html">Don't have an account? Sign Up</a>
                     </div>
                 </div>
             </form>
@@ -56,65 +53,65 @@
     </footer>
 
     <script>
-document.getElementById("login").addEventListener("submit", async function(e){
+    document.getElementById("login").addEventListener("submit", async function(e) {
+        e.preventDefault();
 
-    e.preventDefault();
+        const email    = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+        const btn      = document.getElementById("loginBtn");
 
-    const email = document.querySelector('input[type="email"]').value;
-    const password = document.querySelector('input[type="password"]').value;
-try {
-    const res = await fetch("http://localhost:5000/api/users/login",{
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body: JSON.stringify({email,password})
-    });
+        btn.textContent = "Logging in...";
+        btn.disabled = true;
 
-   const data = await res.json();
-   
+        try {
+            const res = await fetch("http://localhost:5000/api/users/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password })
+            });
 
-    if(res.ok){
-   
-    localStorage.setItem("temp_customer_id", data.user);
-    localStorage.setItem("temp_email", email); 
-    localStorage.setItem("temp_role", "customer"); 
+            const data = await res.json();
 
-    console.log("Password correct! Requesting OTP...");
-    
-    
-    const otpRes = await fetch("http://localhost:5000/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        
-        body: JSON.stringify({ email: email, role: 'customer' }) 
-    });
+            if (res.ok) {
+                // FLOW D: Login successful — store JWT and go straight to dashboard
+                // No OTP sent, no OTP page redirect
+                localStorage.setItem("customer_id", data.customer_id);
+                localStorage.setItem("auth_token", data.token);
+                localStorage.removeItem("temp_email");
+                localStorage.removeItem("temp_role");
+                localStorage.removeItem("temp_customer_id");
 
-    const otpData = await otpRes.json();
+                window.location.href = "CustomerDashboard.html";
 
-    if (otpData.success) {
-       
-        window.location.href = "OtpVerification.html";
-    } else {
-        alert("Failed to send OTP email. Please try again.");
-                    loginBtn.innerHTML = originalBtnText;
-                    loginBtn.disabled = false;
-    }
+            } else if (res.status === 403 && data.requires_otp) {
+                // FLOW D: Account exists but was never verified — send them to OTP page
+                alert("Your account is not yet verified. A new verification code will be sent.");
+                localStorage.setItem("temp_email", data.email);
+                localStorage.setItem("temp_role", "customer");
 
-} else {
-    alert(data.message);
-    loginBtn.innerHTML = originalBtnText;
-    loginBtn.disabled = false;
-}
+                // Request a fresh OTP for the unverified account
+                await fetch("http://localhost:5000/api/send-otp", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: data.email, role: "customer" })
+                });
 
-} catch (error) {
+                window.location.href = "OtpVerification.html";
+
+            } else {
+                alert(data.message || "Login failed.");
+                btn.textContent = "Log In";
+                btn.disabled = false;
+            }
+
+        } catch (error) {
             console.error("Login Error:", error);
             alert("A network error occurred. Please check if the server is running.");
-            loginBtn.innerHTML = originalBtnText;
-            loginBtn.disabled = false;
+            btn.textContent = "Log In";
+            btn.disabled = false;
         }
+    });
+    </script>
 
-});
-</script>
 </body>
 </html>

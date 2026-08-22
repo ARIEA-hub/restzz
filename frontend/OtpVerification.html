@@ -3,24 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Q-Sense | Verify Identity</title>
+    <title>Q-Sense | Verify Your Account</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
-      
         .otp-input {
-            font-size: 24px;
-            letter-spacing: 8px;
+            font-size: 28px;
+            letter-spacing: 12px;
             text-align: center;
             font-weight: bold;
+            width: 100%;
         }
         .instruction-text {
             text-align: center;
             margin-bottom: 20px;
             color: #555;
-            line-height: 1.5;
+            line-height: 1.6;
+        }
+        .resend-link {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            color: #3178c6;
+            font-size: 14px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            text-decoration: underline;
+        }
+        .resend-link:disabled { color: #aaa; cursor: default; text-decoration: none; }
+        .note-box {
+            background: #eef5fb;
+            border: 1px solid #c2d9f0;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #3178c6;
+            text-align: center;
         }
     </style>
 </head>
@@ -35,24 +57,48 @@
 
     <main class="login-container">
         <div class="login-card">
-            <h2 style="text-align: center;">Verify Your Identity</h2>
+            <h2 style="text-align:center;">Activate Your Account</h2>
+
+            <!-- FLOW D: This page is for Registration Verification ONLY -->
+            <!-- After verifying, user is redirected to login — not directly to dashboard -->
+            <div class="note-box">
+                🔒 This is a one-time account activation step.<br>
+                After verification, you will be taken to the login page.
+            </div>
+
             <p class="instruction-text">
-                We've sent a 6-digit verification code to <br>
-                <strong id="display-email">your email</strong>.
+                A 6-digit verification code was sent to:<br>
+                <strong id="display-email">your email</strong>
             </p>
 
             <form id="otpForm">
                 <div class="input-group">
-                    <input type="text" id="otpInput" class="otp-input" placeholder="000000" maxlength="6" required autocomplete="off">
+                    <input
+                        type="text"
+                        id="otpInput"
+                        class="otp-input"
+                        placeholder="000000"
+                        maxlength="6"
+                        inputmode="numeric"
+                        pattern="[0-9]{6}"
+                        required
+                        autocomplete="one-time-code"
+                    >
                 </div>
-                
-                <div class="action-row" style="justify-content: center; margin-top: 20px;">
-                    <button type="submit" class="login-btn full-width">Verify & Log In</button>
+
+                <div class="action-row" style="justify-content:center;margin-top:20px;">
+                    <button type="submit" id="verifyBtn" class="login-btn full-width">
+                        Verify &amp; Activate Account
+                    </button>
                 </div>
             </form>
-            
-            <div style="text-align: center; margin-top: 15px;">
-                <a href="AdminLogin.html" style="color: #3178c6; text-decoration: none; font-size: 14px;">Back to Login</a>
+
+            <button class="resend-link" id="resendBtn">
+                Didn't get a code? Resend
+            </button>
+
+            <div style="text-align:center;margin-top:15px;">
+                <a href="index.html" style="color:#888;font-size:13px;">← Back to Home</a>
             </div>
         </div>
     </main>
@@ -62,77 +108,104 @@
     </footer>
 
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            
-            const email = localStorage.getItem("temp_email");
-            const role = localStorage.getItem("temp_role");
+    document.addEventListener("DOMContentLoaded", () => {
 
-                     if (!email || !role) {
-                window.location.href = "AdminLogin.html";
+        const email = localStorage.getItem("temp_email");
+        const role  = localStorage.getItem("temp_role");
+
+        // Guard: if no temp_email/role, user got here incorrectly
+        if (!email || !role) {
+            alert("Session expired or invalid access. Please register again.");
+            window.location.href = "index.html";
+            return;
+        }
+
+        document.getElementById("display-email").textContent = email;
+
+        // ── OTP SUBMIT ──────────────────────────────────────────────
+        document.getElementById("otpForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+
+            const otp       = document.getElementById("otpInput").value.trim();
+            const verifyBtn = document.getElementById("verifyBtn");
+
+            if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
+                alert("Please enter a valid 6-digit code.");
                 return;
             }
 
-         
-            document.getElementById("display-email").textContent = email;
+            verifyBtn.textContent = "Verifying...";
+            verifyBtn.disabled    = true;
 
-       
-        document.getElementById("otpForm").addEventListener("submit", async function(e) {
-    e.preventDefault();
-    
-    const otp = document.getElementById("otpInput").value;
-    
-    // BUG 1 FIX: Grab the variables from local storage!
-    const email = localStorage.getItem("temp_email");
-    const role = localStorage.getItem("temp_role");
+            try {
+                const res  = await fetch("http://localhost:5000/api/verify-otp", {
+                    method:  "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body:    JSON.stringify({ email, otp, role })
+                });
+                const data = await res.json();
 
-    try {
-        const res = await fetch("http://localhost:5000/api/verify-otp", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ email, otp, role })
+                if (data.success) {
+                    // FLOW D: Account activated — clean up temp storage
+                    localStorage.removeItem("temp_email");
+                    localStorage.removeItem("temp_role");
+                    localStorage.removeItem("temp_customer_id");
+
+                    alert("✅ Account verified successfully! You can now log in.");
+
+                    // FLOW D: Go to login — NOT dashboard
+                    // User must log in properly to receive their JWT
+                    window.location.href = data.redirect || (role === "customer"
+                        ? "CustomerLogin.html"
+                        : "AdminLogin.html");
+
+                } else {
+                    alert(data.message || "Verification failed. Please check your code.");
+                    verifyBtn.textContent = "Verify & Activate Account";
+                    verifyBtn.disabled    = false;
+                }
+
+            } catch (err) {
+                console.error("OTP verify error:", err);
+                alert("A network error occurred.");
+                verifyBtn.textContent = "Verify & Activate Account";
+                verifyBtn.disabled    = false;
+            }
         });
 
-        const data = await res.json();
+        // ── RESEND OTP ───────────────────────────────────────────────
+        document.getElementById("resendBtn").addEventListener("click", async function() {
+            const btn = this;
+            btn.disabled    = true;
+            btn.textContent = "Sending...";
 
-       if (data.success) {
-    if (role === 'admin' || role === 'staff' || role === 'manager') {
-        localStorage.setItem("admin_id", localStorage.getItem("temp_admin_id"));
-        localStorage.setItem("restaurant_id", localStorage.getItem("temp_restaurant_id"));
-        localStorage.setItem("role", localStorage.getItem("temp_role"));
-        localStorage.setItem("admin_email", email); 
-        localStorage.setItem("name",name);
-        
-        // Clean up temp variables
-        localStorage.removeItem("temp_email");
-        localStorage.removeItem("temp_admin_id");
-        localStorage.removeItem("temp_restaurant_id");
-        localStorage.removeItem("temp_role");
-        
-        // 🚨 FORCE THE ADMIN ROUTE HERE
-        window.location.href = "AdminDashboard.html"; 
-        
-    } else {
-        localStorage.setItem("customer_id", localStorage.getItem("temp_customer_id"));
-        
-        // Clean up temp variables
-        localStorage.removeItem("temp_email");
-        localStorage.removeItem("temp_customer_id");
-        localStorage.removeItem("temp_role");
-        
-        // 🚨 FORCE THE CUSTOMER ROUTE HERE (adjust to your preferred customer landing page)
-        window.location.href = "CustomerDashboard.html"; 
-    }
-} else {
-    alert(data.message);
-}
-    } catch (error) {
-        console.error("OTP Error:", error);
-        alert("An error occurred while verifying your code.");
-    }
-});
+            try {
+                const res  = await fetch("http://localhost:5000/api/send-otp", {
+                    method:  "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body:    JSON.stringify({ email, role })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    btn.textContent = "Code resent! Check your email.";
+                    // Re-enable after 30 seconds to prevent spam
+                    setTimeout(() => {
+                        btn.textContent = "Didn't get a code? Resend";
+                        btn.disabled    = false;
+                    }, 30000);
+                } else {
+                    btn.textContent = "Failed to resend. Try again.";
+                    btn.disabled    = false;
+                }
+
+            } catch (err) {
+                btn.textContent = "Network error. Try again.";
+                btn.disabled    = false;
+            }
         });
+    });
     </script>
+
 </body>
 </html>

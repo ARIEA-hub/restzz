@@ -1,72 +1,69 @@
-require('dotenv').config();
+// api/server.js
+// Q-Sense Express Entry Point
+
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const express = require('express');
-const cors = require('cors');
-const db = require('./database.js');
-const app = express();
+const cors    = require('cors');
+const db      = require('./database.js');
+const app     = express();
 
+// ── CORS ────────────────────────────────────────────────────────────
+// NOTE: FRONTEND_ORIGIN must be set in .env. Never use '*' with credentials.
 app.use(cors({
-    origin: process.env.FRONTEND_ORIGIN,                 
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    origin: process.env.FRONTEND_ORIGIN || 'http://127.0.0.1:5501',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true
 }));
+
 app.use(express.json());
 
-
-app.get('/', (req, res) => { 
-    res.send('Q-Sense Backend Running');
+// ── HEALTH CHECKS ───────────────────────────────────────────────────
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'Q-Sense Backend Running', version: '2.0.0' });
 });
 
-app.get('/test-db', async(req,res) => { 
-    try{
-        // FIX: Removed array destructuring [rows] since pg returns a result object
-        await db.query('SELECT 1'); 
-        res.json({message: 'Database Connected Successfully.'});
-    }
-    catch(error){
-        res.status(500).json({error: error.message});
-    }
-});
-
-// API Routes
-const userRoutes = require('./routes/users');
-app.use('/api/users', userRoutes);
-
-const adminRoutes = require('./routes/admin');
-app.use('/api/admin', adminRoutes);
-
-const restRoutes = require('./routes/restaurant');
-app.use('/api/restaurant', restRoutes);
-
-const tableRoutes = require('./routes/tables');
-app.use('/api/tables', tableRoutes);
-
-const otpRoutes = require('./routes/otp');
-app.use('/api', otpRoutes); 
-
-const reservationRoutes = require('./routes/reservations');
-app.use('/api/reservations', reservationRoutes);
-
-const queueRoutes = require('./routes/queue');
-app.use('/api/queue', queueRoutes);
-
-app.get('/api/restaurants', async (req, res) => {
+app.get('/test-db', async (req, res) => {
     try {
-        // FIX: Replaced [restaurants] destructuring with result object extraction
-        const result = await db.query("SELECT * FROM restaurant");
-        res.json(result.rows);
+        const [rows] = await db.query('SELECT NOW() AS server_time');
+        res.json({
+            message: 'Database Connected Successfully.',
+            server_time: rows[0].server_time
+        });
     } catch (error) {
-        console.error("Error fetching restaurants:", error);
-        res.status(500).json({ message: "Failed to load restaurants." });
+        res.status(500).json({ error: error.message });
     }
 });
 
-app.get('/test', (req, res) => {
-   res.send("Server routes working");
+// ── API ROUTES ───────────────────────────────────────────────────────
+const userRoutes        = require('./routes/users');
+const adminRoutes       = require('./routes/admin');
+const restRoutes        = require('./routes/restaurant');
+const tableRoutes       = require('./routes/tables');
+const otpRoutes         = require('./routes/otp');
+const reservationRoutes = require('./routes/reservations');
+const queueRoutes       = require('./routes/queue');
+const locationRoutes    = require('./routes/location');   // NEW — Feature C
+
+app.use('/api/users',        userRoutes);
+app.use('/api/admin',        adminRoutes);
+app.use('/api/restaurant',   restRoutes);
+app.use('/api/tables',       tableRoutes);
+app.use('/api',              otpRoutes);        // Mounts: /api/send-otp, /api/verify-otp
+app.use('/api/reservations', reservationRoutes);
+app.use('/api/queue',        queueRoutes);
+app.use('/api/location',     locationRoutes);   // NEW — Feature C
+
+// ── GLOBAL ERROR HANDLER (Express 5 requires this) ──────────────────
+app.use((err, req, res, next) => {
+    console.error('[Global Error]', err.stack);
+    res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
-
+// ── START SERVER ─────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`✅ Q-Sense server running on port ${PORT}`);
+    console.log(`   CORS origin: ${process.env.FRONTEND_ORIGIN}`);
 });

@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Q-Sense | Admin Sign Up</title>
-   <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -27,26 +27,23 @@
     <main class="login-container">
         <div class="login-card">
             <h2>Admin Account Creation</h2>
+
+            <!-- FLOW D: On success → OTP verification page, NOT AdminLogin.html -->
             <form id="signup">
-                
                 <div class="input-group">
                     <input type="text" id="name" placeholder="Full Name" required>
                 </div>
-                
                 <div class="input-group">
                     <input type="email" id="email" placeholder="Email Address" required>
                 </div>
-                
                 <div class="input-group">
                     <input type="tel" id="phone" placeholder="Phone Number" required>
                 </div>
-
                 <div class="input-group">
                     <select id="restaurant_id" required>
                         <option value="">Loading restaurants...</option>
-                        </select>
+                    </select>
                 </div>
-
                 <div class="input-group">
                     <select id="role" required>
                         <option value="">Select your role...</option>
@@ -54,18 +51,15 @@
                         <option value="manager">Manager</option>
                     </select>
                 </div>
-
                 <div class="input-group">
                     <input type="password" id="password" placeholder="Password" required>
                 </div>
-                
                 <div class="input-group">
                     <input type="password" id="confirm_password" placeholder="Confirm Password" required>
                 </div>
-
                 <div class="action-row">
-                    <button type="submit" class="login-btn full-width">Sign Up</button>
-                    <div class="links" style="margin-top: 15px; text-align: center;">
+                    <button type="submit" id="signupBtn" class="login-btn full-width">Create Account</button>
+                    <div class="links" style="margin-top:15px;text-align:center;">
                         <a href="AdminLogin.html">Already have an account? Log In</a>
                     </div>
                 </div>
@@ -78,66 +72,72 @@
     </footer>
 
     <script>
-        document.addEventListener("DOMContentLoaded", async function() {
-            try {
-                const response = await fetch("http://localhost:5000/api/restaurant");
-                const restaurants = await response.json();
-                
-                const selectElement = document.getElementById("restaurant_id");
-                selectElement.innerHTML = '<option value="">Select your Restaurant...</option>';
-                
-                restaurants.forEach(rest => {
-                    const option = document.createElement("option");
-                    option.value = rest.restaurant_id;
-                    option.textContent = `${rest.name} (${rest.location})`;
-                    selectElement.appendChild(option);
-                });
-            } catch (error) {
-                console.error("Error fetching restaurants:", error);
-                document.getElementById("restaurant_id").innerHTML = '<option value="">Error loading restaurants</option>';
+    // Populate restaurant dropdown on page load
+    document.addEventListener("DOMContentLoaded", async function() {
+        try {
+            const response    = await fetch("http://localhost:5000/api/restaurant");
+            const restaurants = await response.json();
+            const sel         = document.getElementById("restaurant_id");
+            sel.innerHTML     = '<option value="">Select your Restaurant...</option>';
+            restaurants.forEach(r => {
+                const opt       = document.createElement("option");
+                opt.value       = r.restaurant_id;
+                opt.textContent = `${r.name} (${r.location})`;
+                sel.appendChild(opt);
+            });
+        } catch (err) {
+            console.error("Error loading restaurants:", err);
+            document.getElementById("restaurant_id").innerHTML =
+                '<option value="">Error loading — is server running?</option>';
+        }
+    });
+
+    document.getElementById("signup").addEventListener("submit", async function(e) {
+        e.preventDefault();
+
+        const name          = document.getElementById("name").value.trim();
+        const email         = document.getElementById("email").value.trim();
+        const phone         = document.getElementById("phone").value.trim();
+        const restaurant_id = document.getElementById("restaurant_id").value;
+        const role          = document.getElementById("role").value;
+        const password      = document.getElementById("password").value;
+        const confirm       = document.getElementById("confirm_password").value;
+        const btn           = document.getElementById("signupBtn");
+
+        if (password !== confirm) { alert("Passwords do not match!"); return; }
+        if (!restaurant_id)       { alert("Please select a restaurant."); return; }
+        if (!role)                { alert("Please select a role."); return; }
+
+        btn.textContent = "Creating Account...";
+        btn.disabled    = true;
+
+        try {
+            const res  = await fetch("http://localhost:5000/api/admin/register", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({ restaurant_id, name, email, phone, password, role })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.requires_otp) {
+                // FLOW D: Account created with is_verified=false — go verify via OTP
+                localStorage.setItem("temp_email", email);
+                localStorage.setItem("temp_role",  role);
+                window.location.href = "OtpVerification.html";
+
+            } else {
+                alert("Error: " + (data.error || data.message || "Unknown error"));
+                btn.textContent = "Create Account";
+                btn.disabled    = false;
             }
-        });
 
-            document.getElementById("signup").addEventListener("submit", async function(e){
-            e.preventDefault();
-
-            
-            const name = document.getElementById("name").value;
-            const email = document.getElementById("email").value;
-            const phone = document.getElementById("phone").value;
-            const restaurant_id = document.getElementById("restaurant_id").value;
-            const role = document.getElementById("role").value;
-            const password = document.getElementById("password").value;
-            const confirmPassword = document.getElementById("confirm_password").value;
-
-            if(password !== confirmPassword) {
-                alert("Passwords do not match!");
-                return;
-            }
-
-            try {
-                const res = await fetch("http://localhost:5000/api/admin/register", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                   
-                    body: JSON.stringify({ restaurant_id, name, email, phone, password, role })
-                });
-
-                const data = await res.json();
-
-                if(res.ok) {
-                    alert("Account created successfully. Please log in.");
-                    window.location.href = "AdminLogin.html";
-                } else {
-                    alert("Error: " + (data.message || data.error));
-                }
-            } catch (error) {
-                console.error("Signup error:", error);
-                alert("An error occurred during sign up.");
-            }
-        });
+        } catch (err) {
+            console.error("Signup error:", err);
+            alert("A network error occurred.");
+            btn.textContent = "Create Account";
+            btn.disabled    = false;
+        }
+    });
     </script>
 
 </body>
