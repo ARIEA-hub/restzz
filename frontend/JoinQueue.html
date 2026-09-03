@@ -7,7 +7,29 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-        body { background-color: #f4f7f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        body { background-color: #f4f7f9; display: flex; flex-direction: column; align-items: stretch; min-height: 100vh; padding: 0; }
+
+        .navbar { min-height: 70px; padding: 14px 40px; background: #fff; border-bottom: 1px solid #e1e8ed; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 2000; }
+        .navbar .logo { display: flex; align-items: center; gap: 8px; color: #3178c6; font-size: 1.5rem; font-weight: 800; white-space: nowrap; }
+        .navbar .nav-links { display: flex; align-items: center; gap: 24px; }
+        .navbar .nav-links a { color: #555; text-decoration: none; font-weight: 600; }
+        .navbar .nav-links a:hover, .navbar .nav-links a.active { color: #3178c6; }
+        .profile-menu { position: relative; }
+        .profile-toggle { display: inline-flex; align-items: center; gap: 10px; min-height: 42px; padding: 7px 14px 7px 8px; border: 1px solid #dfeaf5; border-radius: 999px; background: #fff; color: #1a1a1a; font: inherit; font-weight: 600; cursor: pointer; }
+        .profile-toggle:hover, .profile-toggle:focus-visible { border-color: #3178c6; outline: none; }
+        #navUserInitial { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border-radius: 50%; background: #3178c6; color: #fff; font-size: 0.8rem; }
+        .caret { color: #666; font-size: 0.8rem; }
+        .profile-dropdown { position: absolute; top: calc(100% + 8px); right: 0; display: flex; min-width: 190px; flex-direction: column; overflow: hidden; background: #fff; border: 1px solid #e7edf3; border-radius: 12px; box-shadow: 0 15px 30px rgba(0,0,0,.12); }
+        .profile-dropdown.hidden { display: none; }
+        .profile-dropdown a { padding: 12px 14px; color: #333; text-decoration: none; border-bottom: 1px solid #eef3f8; }
+        .profile-dropdown a:hover { background: #f4f8fc; }
+        .profile-dropdown a:last-child { color: #d9534f; border-bottom: 0; }
+        .queue-card { margin: 40px auto; }
+
+        @media (max-width: 760px) {
+            .navbar { flex-wrap: wrap; gap: 12px; padding: 12px 18px; }
+            .navbar .nav-links { order: 3; width: 100%; justify-content: center; gap: 14px; overflow-x: auto; }
+        }
         
         .queue-card {
             background: white;
@@ -29,6 +51,8 @@
         
         .btn { width: 100%; background: #3178c6; color: white; border: none; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn:hover { background: #255a96; }
+        .leave-btn { width: 100%; margin-top: 12px; padding: 11px 15px; border: 1px solid #d9534f; border-radius: 8px; background: #fff; color: #d9534f; font: inherit; font-weight: 600; cursor: pointer; transition: background 0.2s, color 0.2s; }
+        .leave-btn:hover { background: #d9534f; color: #fff; }
 
    
         #tracker-section { display: none; }
@@ -75,6 +99,28 @@
 </head>
 <body>
 
+    <header class="navbar">
+        <div class="logo">🍴 Q-Sense</div>
+        <nav class="nav-links">
+            <a href="CustomerHome.html">Home</a>
+            <a href="CustomerDashboard.html">Dashboard</a>
+            <a href="locations.html">Locations</a>
+            <a href="CustomerReservation.html">Reservation</a>
+        </nav>
+        <div class="profile-menu">
+            <button id="profileToggle" class="profile-toggle" type="button" aria-expanded="false">
+                <span id="navUserInitial">U</span>
+                <span id="navUserName">Profile</span>
+                <span class="caret">▾</span>
+            </button>
+            <div id="profileDropdown" class="profile-dropdown hidden">
+                <a href="CustomerDashboard.html">My Profile</a>
+                <a href="CustomerReservation.html">My Reservations</a>
+                <a href="CustomerLogin.html" id="logoutCustomer">Logout</a>
+            </div>
+        </div>
+    </header>
+
     <div class="queue-card">
         <h2>Live Waitlist</h2>
         <p class="subtitle" id="restaurant-display">Loading restaurant info...</p>
@@ -105,6 +151,7 @@
 
             <div class="wait-time"><span class="loader"></span> Estimated Wait: <span id="display-ewt">--</span> min</div>
             <div class="people-ahead" id="display-ahead">-- parties ahead of you</div>
+            <button id="leave-queue-btn" class="leave-btn" type="button">Leave Queue</button>
         </div>
     </div>
 
@@ -132,7 +179,8 @@
             document.getElementById("restaurant-display").textContent = `Restaurant ID: ${restaurantId}`;
 
             // Check if they are already in a queue! (Resume session)
-            const savedQueueId = localStorage.getItem('current_queue_id');
+            const queueMap = JSON.parse(localStorage.getItem('active_queue_map') || '{}');
+            const savedQueueId = queueMap[restaurantId] || null;
             if (savedQueueId) {
                 switchToTracker(savedQueueId);
             }
@@ -146,7 +194,10 @@
             try {
                 const res = await fetch("http://localhost:5000/api/queue/join", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${localStorage.getItem('auth_token') || ''}`
+                    },
                     body: JSON.stringify({
                         restaurant_id: restaurantId,
                         customer_id: customerId,
@@ -158,6 +209,9 @@
 
                 if (res.ok) {
                    
+                    const queueMap = JSON.parse(localStorage.getItem('active_queue_map') || '{}');
+                    queueMap[restaurantId] = data.queue_id;
+                    localStorage.setItem('active_queue_map', JSON.stringify(queueMap));
                     localStorage.setItem('current_queue_id', data.queue_id);
                     switchToTracker(data.queue_id);
                 } else {
@@ -178,9 +232,47 @@
             pollingInterval = setInterval(() => fetchQueueStatus(queueId), 5000);
         }
 
+        async function leaveQueue(queueId) {
+            const leaveButton = document.getElementById('leave-queue-btn');
+            leaveButton.disabled = true;
+
+            try {
+                const res = await fetch(`http://localhost:5000/api/queue/leave/${queueId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+                    }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Failed to leave queue.');
+
+                clearInterval(pollingInterval);
+                const queueMap = JSON.parse(localStorage.getItem('active_queue_map') || '{}');
+                delete queueMap[restaurantId];
+                localStorage.setItem('active_queue_map', JSON.stringify(queueMap));
+                localStorage.removeItem('current_queue_id');
+                document.getElementById('tracker-section').style.display = 'none';
+                document.getElementById('join-section').style.display = 'block';
+                alert('You have left the queue.');
+            } catch (error) {
+                console.error('Error leaving queue:', error);
+                leaveButton.disabled = false;
+                alert(error.message);
+            }
+        }
+
+        document.getElementById('leave-queue-btn').addEventListener('click', () => {
+            const queueId = localStorage.getItem('current_queue_id');
+            if (queueId && confirm('Leave this queue?')) leaveQueue(queueId);
+        });
+
         async function fetchQueueStatus(queueId) {
             try {
-                const res = await fetch(`http://localhost:5000/api/queue/status/${queueId}`);
+                const res = await fetch(`http://localhost:5000/api/queue/status/${queueId}`, {
+                    headers: {
+                        "Authorization": `Bearer ${localStorage.getItem('auth_token') || ''}`
+                    }
+                });
                 const data = await res.json();
 
                 if (res.ok) {
@@ -200,6 +292,9 @@
                     } else if (data.status === 'seated' || data.status === 'cancelled') {
                        
                         clearInterval(pollingInterval);
+                        const queueMap = JSON.parse(localStorage.getItem('active_queue_map') || '{}');
+                        delete queueMap[restaurantId];
+                        localStorage.setItem('active_queue_map', JSON.stringify(queueMap));
                         localStorage.removeItem('current_queue_id');
                         statusBadge.textContent = data.status === 'seated' ? "Enjoy your meal!" : "Queue Cancelled";
                         document.getElementById("display-position").textContent = "✓";
@@ -209,6 +304,28 @@
                 console.error("Polling error:", error);
             }
         }
+    </script>
+    <script>
+        const profileToggle = document.getElementById('profileToggle');
+        const profileDropdown = document.getElementById('profileDropdown');
+        const logoutCustomer = document.getElementById('logoutCustomer');
+
+        profileToggle.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isHidden = profileDropdown.classList.toggle('hidden');
+            profileToggle.setAttribute('aria-expanded', String(!isHidden));
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('.profile-menu')) {
+                profileDropdown.classList.add('hidden');
+                profileToggle.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        logoutCustomer.addEventListener('click', () => {
+            localStorage.clear();
+        });
     </script>
     <script src="js/navigation.js"></script>
 </body>

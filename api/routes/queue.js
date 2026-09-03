@@ -3,10 +3,28 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../database');
+const jwt     = require('jsonwebtoken');
+
+function getAuthenticatedCustomerId(req) {
+    const authorization = req.headers.authorization || '';
+    if (!authorization.startsWith('Bearer ')) return null;
+
+    try {
+        return jwt.verify(authorization.slice(7), process.env.JWT_SECRET).customer_id;
+    } catch (error) {
+        return null;
+    }
+}
 
 // ── POST /api/queue/join ──────────────────────────────────────────────
 router.post('/join', async (req, res) => {
-    const { restaurant_id, customer_id, group_size } = req.body;
+    const { restaurant_id, group_size } = req.body;
+    const customer_id = getAuthenticatedCustomerId(req);
+
+    if (!customer_id) {
+        return res.status(401).json({ message: 'Please log in again to join the queue.' });
+    }
+
     try {
         // Check if already in queue
         const [existing] = await db.query(
@@ -37,13 +55,48 @@ router.post('/join', async (req, res) => {
     }
 });
 
+// ── PATCH /api/queue/leave/:queueId ─────────────────────────────────
+router.patch('/leave/:queueId', async (req, res) => {
+    const customerId = getAuthenticatedCustomerId(req);
+    if (!customerId) {
+        return res.status(401).json({ message: 'Please log in again to leave the queue.' });
+    }
+
+    try {
+        const [rows] = await db.query(
+            `UPDATE queue
+             SET status = 'left'
+             WHERE queue_id = $1
+               AND customer_id = $2
+               AND status IN ('waiting', 'called')
+             RETURNING queue_id`,
+            [req.params.queueId, customerId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Active queue entry not found.' });
+        }
+
+        res.json({ message: 'You have left the queue.', queue_id: rows[0].queue_id });
+    } catch (error) {
+        console.error('Error leaving queue:', error);
+        res.status(500).json({ message: 'Failed to leave queue.' });
+    }
+});
+
 // ── GET /api/queue/status/:queueId ───────────────────────────────────
 router.get('/status/:queueId', async (req, res) => {
     const queueId = req.params.queueId;
+    const customerId = getAuthenticatedCustomerId(req);
+
+    if (!customerId) {
+        return res.status(401).json({ message: 'Please log in again to view queue status.' });
+    }
+
     try {
         const [userQueue] = await db.query(
-            'SELECT * FROM queue WHERE queue_id = $1',
-            [queueId]
+            'SELECT * FROM queue WHERE queue_id = $1 AND customer_id = $2',
+            [queueId, customerId]
         );
         if (userQueue.length === 0) {
             return res.status(404).json({ message: 'Queue record not found.' });

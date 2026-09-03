@@ -347,7 +347,10 @@ const profileToggle = document.getElementById('profileToggle');
             const customerId = localStorage.getItem('customer_id');
             const response = await fetch('http://localhost:5000/api/chatbots/message', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+                },
                 body: JSON.stringify({ message, userId: customerId })
             });
             const data = await response.json();

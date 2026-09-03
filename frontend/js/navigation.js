@@ -6,6 +6,8 @@
         'Can I reserve a table for 2 tonight?',
         'What is my current queue position?',
         'How long is the estimated wait?',
+        'How do I leave the queue?',
+        'Am I in more than one queue?',
         'How do I cancel a reservation?'
     ];
 
@@ -65,6 +67,64 @@
         }
     }
 
+    function ensureChatbot() {
+        if (document.getElementById('qsense-chatbot')) return;
+
+        const chatbot = document.createElement('div');
+        chatbot.id = 'qsense-chatbot';
+        chatbot.style.cssText = 'position:fixed;right:22px;bottom:22px;z-index:9999;font-family:Inter,sans-serif';
+        chatbot.innerHTML = `
+            <button id="chatbot-toggle" type="button" aria-label="Open Q-Sense Assistant" style="width:64px;height:64px;border:0;border-radius:50%;background:linear-gradient(135deg,#3178c6,#245ea3);color:#fff;font-size:28px;box-shadow:0 12px 30px rgba(49,120,198,.35);cursor:pointer">💬</button>
+            <div id="chatbot-panel" style="display:none;width:340px;max-width:calc(100vw - 24px);background:#fff;border-radius:18px;box-shadow:0 20px 40px rgba(0,0,0,.14);border:1px solid #e7edf3;overflow:hidden;margin-bottom:12px">
+                <div style="padding:14px 16px;background:#3178c6;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:space-between"><span>Q-Sense Assistant</span><button id="chatbot-close" type="button" aria-label="Close assistant" style="background:transparent;border:0;color:#fff;font-size:28px;cursor:pointer;line-height:1">×</button></div>
+                <div id="chatbot-messages" style="height:260px;overflow-y:auto;padding:14px;background:#f7fafd;display:flex;flex-direction:column;gap:10px"><div style="max-width:82%;background:#fff;border:1px solid #e5ecf3;border-radius:12px 12px 12px 4px;padding:10px 12px;color:#334;font-size:.92rem">Hi! Ask about reservations, queues, table availability, or restaurant info.</div></div>
+                <form id="chatbot-form" style="display:flex;border-top:1px solid #e7edf3;padding:10px;background:#fff;gap:8px"><input id="chatbot-input" type="text" placeholder="Ask about bookings or queues..." style="flex:1;border:1px solid #dfeaf5;border-radius:10px;padding:10px 12px;font-size:.92rem;outline:0"><button type="submit" style="background:#3178c6;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer">Send</button></form>
+            </div>`;
+        document.body.appendChild(chatbot);
+
+        const toggle = chatbot.querySelector('#chatbot-toggle');
+        const panel = chatbot.querySelector('#chatbot-panel');
+        const close = chatbot.querySelector('#chatbot-close');
+        const form = chatbot.querySelector('#chatbot-form');
+        const input = chatbot.querySelector('#chatbot-input');
+        const messages = chatbot.querySelector('#chatbot-messages');
+
+        const appendMessage = (text, isUser) => {
+            const bubble = document.createElement('div');
+            bubble.textContent = text;
+            bubble.style.cssText = `max-width:82%;padding:10px 12px;border-radius:${isUser ? '12px 12px 4px 12px' : '12px 12px 12px 4px'};align-self:${isUser ? 'flex-end' : 'flex-start'};background:${isUser ? '#3178c6' : '#fff'};color:${isUser ? '#fff' : '#2e3a46'};border:${isUser ? '0' : '1px solid #e5ecf3'};font-size:.92rem`;
+            messages.appendChild(bubble);
+            messages.scrollTop = messages.scrollHeight;
+        };
+
+        toggle.addEventListener('click', () => { panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; });
+        close.addEventListener('click', () => { panel.style.display = 'none'; });
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const message = input.value.trim();
+            if (!message) return;
+
+            appendMessage(message, true);
+            input.value = '';
+            try {
+                const response = await fetch('http://localhost:5000/api/chatbots/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+                    },
+                    body: JSON.stringify({ message, userId: localStorage.getItem('customer_id') })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'The assistant could not answer right now.');
+                appendMessage(data.reply || 'I could not generate a response for that question.', false);
+            } catch (error) {
+                console.error('Chatbot request failed:', error);
+                appendMessage(error.message, false);
+            }
+        });
+    }
+
     function addChatbotFaq() {
         const chatbot = document.getElementById('qsense-chatbot');
         const form = document.getElementById('chatbot-form');
@@ -90,6 +150,7 @@
         form.parentNode.insertBefore(faq, form);
     }
 
+    ensureChatbot();
     addChatbotFaq();
     loadCustomerName();
 })();
