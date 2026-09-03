@@ -10,6 +10,20 @@
         body { background-color: #f4f7f9; display: flex; height: 100vh; overflow: hidden; }
 
     
+        .top-nav { background: white; border-bottom: 1px solid #e1e8ed; display: flex; justify-content: space-between; align-items: center; padding: 14px 30px; }
+        .brand { color: #3178c6; font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+        .nav-links { display: flex; align-items: center; gap: 26px; }
+        .nav-links a { text-decoration: none; color: #555; font-weight: 600; }
+        .nav-links a:hover, .nav-links a.active { color: #3178c6; }
+        .profile-menu { position: relative; }
+        .profile-toggle { display: inline-flex; align-items: center; gap: 10px; border: 1px solid #dfeaf5; background: white; color: #1a1a1a; border-radius: 999px; padding: 8px 14px; cursor: pointer; font-weight: 600; }
+        .profile-toggle #navUserInitial { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; background: #3178c6; color: white; align-items: center; justify-content: center; font-size: 0.8rem; }
+        .caret { font-size: 0.8rem; color: #666; }
+        .profile-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: white; border: 1px solid #e7edf3; border-radius: 12px; min-width: 180px; box-shadow: 0 15px 30px rgba(0,0,0,0.08); display: flex; flex-direction: column; overflow: hidden; }
+        .profile-dropdown.hidden { display: none; }
+        .profile-dropdown a { padding: 12px 14px; text-decoration: none; color: #333; border-bottom: 1px solid #eef3f8; }
+        .profile-dropdown a:last-child { color: #d9534f; border-bottom: none; }
+
         .sidebar { width: 280px; background: #fff; border-right: 1px solid #e1e8ed; display: flex; flex-direction: column; }
         .sidebar-header { padding: 20px; border-bottom: 1px solid #e1e8ed; }
         .sidebar-header h1 { color: #3178c6; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
@@ -36,8 +50,31 @@
 
         .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e1e8ed; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
     </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <header class="top-nav">
+        <div href="index.html" class="brand">🍴 Q-Sense</div>
+        <nav class="nav-links">
+            <a href="AdminDashboard.html" class="active">Overview</a>
+            <a href="AdminTableManagement.html">Tables</a>
+            <a href="AdminDashboard.html">Queue</a>
+            <a href="AdminDashboard.html">Support</a>
+        </nav>
+        <div class="profile-menu">
+            <button id="profileToggle" class="profile-toggle" type="button" aria-expanded="false">
+                <span id="navUserInitial">A</span>
+                <span id="navUserName">Admin</span>
+                <span class="caret">▾</span>
+            </button>
+            <div id="profileDropdown" class="profile-dropdown hidden">
+                <a href="AdminDashboard.html">Profile</a>
+                <a href="AdminTableManagement.html">Table Overview</a>
+                <a href="#" id="logoutAdmin">Logout</a>
+            </div>
+        </div>
+    </header>
 
     <aside class="sidebar">
         <div class="sidebar-header">
@@ -138,6 +175,35 @@
             window.location.href = "AdminLogin.html"; 
         }
 
+        const profileToggle = document.getElementById('profileToggle');
+        const profileDropdown = document.getElementById('profileDropdown');
+        const logoutAdminLink = document.getElementById('logoutAdmin');
+
+        function populateProfileMenu() {
+            const name = localStorage.getItem('admin_email') || 'Admin';
+            const firstLetter = name.trim().charAt(0).toUpperCase() || 'A';
+            document.getElementById('navUserInitial').textContent = firstLetter;
+            document.getElementById('navUserName').textContent = name.split('@')[0] || 'Admin';
+        }
+
+        profileToggle.addEventListener('click', () => {
+            profileDropdown.classList.toggle('hidden');
+            profileToggle.setAttribute('aria-expanded', profileDropdown.classList.contains('hidden') ? 'false' : 'true');
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('.profile-menu')) {
+                profileDropdown.classList.add('hidden');
+                profileToggle.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        logoutAdminLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            logout();
+        });
+
+        populateProfileMenu();
 
         window.addEventListener("DOMContentLoaded", async () => {
             const adminId = localStorage.getItem("admin_id");
@@ -307,5 +373,6 @@
             });
         }, 30000); 
     </script>
+    <script src="js/navigation.js"></script>
 </body>
 </html>

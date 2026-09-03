@@ -9,10 +9,24 @@ const cors    = require('cors');
 const db      = require('./database.js');
 const app     = express();
 
+const allowedOrigins = [
+    'http://127.0.0.1:5500',
+    'http://127.0.0.1:5501',
+    'http://localhost:5500',
+    'http://localhost:5501',
+    process.env.FRONTEND_ORIGIN
+].filter(Boolean);
+
 // ── CORS ────────────────────────────────────────────────────────────
-// NOTE: FRONTEND_ORIGIN must be set in .env. Never use '*' with credentials.
 app.use(cors({
-    origin: process.env.FRONTEND_ORIGIN || 'http://127.0.0.1:5501',
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+            return;
+        }
+
+        callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true
 }));
@@ -45,6 +59,7 @@ const otpRoutes         = require('./routes/otp');
 const reservationRoutes = require('./routes/reservations');
 const queueRoutes       = require('./routes/queue');
 const locationRoutes    = require('./routes/location');   // NEW — Feature C
+const chatbotRoutes = require('./routes/chatbots');
 
 app.use('/api/users',        userRoutes);
 app.use('/api/admin',        adminRoutes);
@@ -54,6 +69,9 @@ app.use('/api',              otpRoutes);        // Mounts: /api/send-otp, /api/v
 app.use('/api/reservations', reservationRoutes);
 app.use('/api/queue',        queueRoutes);
 app.use('/api/location',     locationRoutes);   // NEW — Feature C
+app.use('/api/restaurant',   restRoutes);
+app.use('/api/restaurants',  restRoutes);
+app.use('/api/chatbots', chatbotRoutes);
 
 // ── GLOBAL ERROR HANDLER (Express 5 requires this) ──────────────────
 app.use((err, req, res, next) => {
