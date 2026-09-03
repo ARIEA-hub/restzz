@@ -19,7 +19,7 @@ router.get('/restaurant/:id', async (req, res) => {
 });
 
 // ── PATCH /api/tables/:tableId/status ────────────────────────────────
-// Updates table status: 'vacant' | 'occupied' | 'reserved' | 'unavailable'
+// Updates table status: vacant (Free), occupied, reserved, or unavailable (Cleaning / Under Service)
 router.patch('/:tableId/status', async (req, res) => {
     const { status } = req.body;
     const validStatuses = ['vacant', 'occupied', 'reserved', 'unavailable'];

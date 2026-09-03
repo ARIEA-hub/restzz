@@ -7,10 +7,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-        body { background-color: #f4f7f9; display: flex; height: 100vh; overflow: hidden; }
+        body.admin-dashboard-page { background-color: #f4f7f9; display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); height: 100vh; overflow: hidden; }
 
     
-        .top-nav { background: white; border-bottom: 1px solid #e1e8ed; display: flex; justify-content: space-between; align-items: center; padding: 14px 30px; }
+        .top-nav { grid-column: 1 / -1; grid-row: 1; background: white; border-bottom: 1px solid #e1e8ed; display: flex; justify-content: space-between; align-items: center; padding: 14px 30px; }
         .brand { color: #3178c6; font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 10px; }
         .nav-links { display: flex; align-items: center; gap: 26px; }
         .nav-links a { text-decoration: none; color: #555; font-weight: 600; }
@@ -24,7 +24,7 @@
         .profile-dropdown a { padding: 12px 14px; text-decoration: none; color: #333; border-bottom: 1px solid #eef3f8; }
         .profile-dropdown a:last-child { color: #d9534f; border-bottom: none; }
 
-        .sidebar { width: 280px; background: #fff; border-right: 1px solid #e1e8ed; display: flex; flex-direction: column; }
+        .sidebar { grid-column: 1; grid-row: 2; min-width: 0; background: #fff; border-right: 1px solid #e1e8ed; display: flex; flex-direction: column; }
         .sidebar-header { padding: 20px; border-bottom: 1px solid #e1e8ed; }
         .sidebar-header h1 { color: #3178c6; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
         
@@ -33,7 +33,7 @@
         .admin-profile p { font-size: 0.85rem; color: #666; margin-top: 5px; }
         .badge { display: inline-block; background: #3178c6; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; margin-top: 8px; }
 
-        .nav-menu { padding: 15px 0; flex: 1; }
+        .nav-menu { padding: 15px 0; flex: 1; display: flex; flex-direction: column; align-items: stretch; }
         .nav-item { padding: 12px 20px; color: #555; text-decoration: none; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; font-weight: 500; }
         .nav-item:hover { background: #f4f7f9; color: #3178c6; }
         .nav-item.active { background: #eef5fb; color: #3178c6; border-right: 4px solid #3178c6; }
@@ -41,7 +41,7 @@
         .logout-btn { margin: 20px; padding: 10px; text-align: center; background: #fff; border: 1px solid #d9534f; color: #d9534f; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .logout-btn:hover { background: #d9534f; color: white; }
 
-        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .main-content { grid-column: 2; grid-row: 2; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; }
         .topbar { background: #fff; padding: 20px 30px; border-bottom: 1px solid #e1e8ed; display: flex; justify-content: space-between; align-items: center; }
         .topbar h2 { color: #333; font-weight: 600; }
         
@@ -49,18 +49,22 @@
         .content-section.active { display: block; } 
 
         .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e1e8ed; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+
+        @media (max-width: 800px) {
+            .top-nav { flex-wrap: wrap; gap: 12px; padding: 12px 18px; }
+            .top-nav .nav-links { order: 3; width: 100%; justify-content: center; gap: 14px; overflow-x: auto; }
+        }
     </style>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="admin-dashboard-page">
 
     <header class="top-nav">
-        <div href="index.html" class="brand">🍴 Q-Sense</div>
+        <a href="index.html" class="brand">🍴 Q-Sense</a>
         <nav class="nav-links">
-            <a href="AdminDashboard.html" class="active">Overview</a>
+            <a href="#table-management" class="active" onclick="switchTabFromTop(event, 'table-management', this)">Overview</a>
             <a href="AdminTableManagement.html">Tables</a>
-            <a href="AdminDashboard.html">Queue</a>
-            <a href="AdminDashboard.html">Support</a>
+            <a href="#live-queue" onclick="switchTabFromTop(event, 'live-queue', this)">Queue</a>
         </nav>
         <div class="profile-menu">
             <button id="profileToggle" class="profile-toggle" type="button" aria-expanded="false">
@@ -88,17 +92,11 @@
         </div>
 
         <nav class="nav-menu">
-            <div class="nav-item active" onclick="switchTab('table-management', this)">
+            <div class="nav-item active" data-tab="table-management" onclick="switchTab('table-management', this)">
                 📊 Table Management
             </div>
-            <div class="nav-item" onclick="switchTab('live-queue', this)">
+            <div class="nav-item" data-tab="live-queue" onclick="switchTab('live-queue', this)">
                 🚶 Live Queue
-            </div>
-            <div class="nav-item" onclick="switchTab('hours', this)">
-                ⏱️ My Hours
-            </div>
-            <div class="nav-item" onclick="switchTab('contact', this)">
-                📞 Support / Contact
             </div>
         </nav>
 
@@ -133,20 +131,14 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="color: #3178c6; margin: 0;">Live Walk-in Queue</h3>
-                    <button onclick="loadLiveQueue(localStorage.getItem('restaurant_id'))" style="background: #fff; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer;">
-                        🔄 Refresh
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="smartAllocateTable()" style="background: #3178c6; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">🤖 Allocate Ready Guest</button>
+                        <button onclick="loadLiveQueue(localStorage.getItem('restaurant_id'))" style="background: #fff; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer;">🔄 Refresh</button>
+                    </div>
                 </div>
                 <p style="color: #666; margin-bottom: 20px;">Manage customers currently waiting for a table.</p>
                 
                 <div id="live-queue-list"></div>
-            </div>
-        </section>
-
-        <section id="hours" class="content-section">
-            <div class="card">
-                <h3 style="color: #3178c6; margin-bottom: 15px;">Timesheet & Hours</h3>
-                <p style="color: #666;">You have logged 32 hours this week.</p>
             </div>
         </section>
 
@@ -168,6 +160,14 @@
             document.getElementById(tabId).classList.add('active');
 
             document.getElementById('page-title').innerText = element.innerText.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+        }
+
+        function switchTabFromTop(event, tabId, link) {
+            event.preventDefault();
+            const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+            if (navItem) switchTab(tabId, navItem);
+            document.querySelectorAll('.top-nav .nav-links a').forEach(item => item.classList.remove('active'));
+            link.classList.add('active');
         }
 
         function logout() {
@@ -218,8 +218,18 @@
             }
 
             document.getElementById("admin-name").textContent = adminEmail;
-            document.getElementById("admin-restaurant").textContent = `Restaurant ID: ${restaurantId}`;
+            document.getElementById("admin-restaurant").textContent = `Restaurant ID: ${restaurantId} · Loading restaurant...`;
             document.getElementById("admin-role-badge").textContent = adminRole.charAt(0).toUpperCase() + adminRole.slice(1);
+
+            try {
+                const restaurantRes = await fetch(`http://localhost:5000/api/restaurant/${restaurantId}`);
+                if (restaurantRes.ok) {
+                    const restaurant = await restaurantRes.json();
+                    document.getElementById("admin-restaurant").textContent = `Restaurant ID: ${restaurantId} · ${restaurant.name}`;
+                }
+            } catch (error) {
+                console.error("Restaurant lookup error:", error);
+            }
 
             await loadPendingReservations(restaurantId);
             await loadLiveQueue(restaurantId);
@@ -359,6 +369,27 @@
             }
         }
 
+        async function smartAllocateTable(showMessage = true) {
+            const restaurantId = localStorage.getItem('restaurant_id');
+            try {
+                const res = await fetch(`http://localhost:5000/api/queue/auto-allocate/${restaurantId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Auto-allocation failed.');
+                if (data.allocated) {
+                    if (showMessage) alert(`Guest allocated to table ${data.table_no}.`);
+                    await loadLiveQueue(restaurantId);
+                } else if (showMessage) {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Smart allocation error:', error);
+                if (showMessage) alert(error.message);
+            }
+        }
+
      
         setInterval(() => {
             document.querySelectorAll('.live-timer').forEach(span => {
@@ -372,6 +403,8 @@
                 }
             });
         }, 30000); 
+
+        setInterval(() => smartAllocateTable(false), 30000);
     </script>
     <script src="js/navigation.js"></script>
 </body>

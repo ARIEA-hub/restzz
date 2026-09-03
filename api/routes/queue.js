@@ -84,6 +84,73 @@ router.patch('/leave/:queueId', async (req, res) => {
     }
 });
 
+// ── POST /api/queue/auto-allocate/:restaurantId ─────────────────────
+// Assigns the smallest suitable free table to the oldest eligible guest.
+router.post('/auto-allocate/:restaurantId', async (req, res) => {
+    const restaurantId = req.params.restaurantId;
+    const client = await db.getClient();
+
+    try {
+        await client.query('BEGIN');
+
+        const queueResult = await client.query(
+            `SELECT q.queue_id, q.group_size, q.customer_id
+             FROM queue q
+             WHERE q.restaurant_id = $1
+               AND q.status = 'waiting'
+               AND q.joined_at <= NOW() - INTERVAL '1 minute'
+             ORDER BY q.joined_at ASC
+             LIMIT 1
+             FOR UPDATE SKIP LOCKED`,
+            [restaurantId]
+        );
+
+        if (queueResult.rows.length === 0) {
+            await client.query('COMMIT');
+            client.release();
+            return res.json({ allocated: false, message: 'No queued guest has waited at least one minute.' });
+        }
+
+        const guest = queueResult.rows[0];
+        const tableResult = await client.query(
+            `SELECT table_id, table_no, capacity
+             FROM restaurant_tables
+             WHERE restaurant_id = $1
+               AND status = 'vacant'
+               AND capacity >= $2
+             ORDER BY capacity ASC, table_no ASC
+             LIMIT 1
+             FOR UPDATE SKIP LOCKED`,
+            [restaurantId, guest.group_size]
+        );
+
+        if (tableResult.rows.length === 0) {
+            await client.query('COMMIT');
+            client.release();
+            return res.json({ allocated: false, message: 'No suitable free table is available.' });
+        }
+
+        const table = tableResult.rows[0];
+        await client.query(
+            "UPDATE restaurant_tables SET status = 'occupied' WHERE table_id = $1",
+            [table.table_id]
+        );
+        await client.query(
+            "UPDATE queue SET status = 'seated' WHERE queue_id = $1",
+            [guest.queue_id]
+        );
+
+        await client.query('COMMIT');
+        client.release();
+        res.json({ allocated: true, queue_id: guest.queue_id, table_no: table.table_no, customer_id: guest.customer_id });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        client.release();
+        console.error('Auto-allocation error:', error);
+        res.status(500).json({ message: 'Failed to auto-allocate a table.' });
+    }
+});
+
 // ── GET /api/queue/status/:queueId ───────────────────────────────────
 router.get('/status/:queueId', async (req, res) => {
     const queueId = req.params.queueId;

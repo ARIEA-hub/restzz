@@ -13,6 +13,10 @@
 
     document.documentElement.classList.add('page-ready');
 
+    window.addEventListener('pageshow', () => {
+        document.body.classList.remove('page-exit');
+    });
+
     function isInternalPageLink(link) {
         if (!link || !link.href || link.target === '_blank') return false;
         if (link.hasAttribute('download') || link.href.startsWith('javascript:')) return false;
