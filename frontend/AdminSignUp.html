@@ -73,13 +73,21 @@
 
     <script>
     // Populate restaurant dropdown on page load
+        // Populate restaurant dropdown on page load
     document.addEventListener("DOMContentLoaded", async function() {
         try {
-            const response    = await fetch("http://localhost:5000/api/restaurant");
-            const restaurants = await response.json();
-            const sel         = document.getElementById("restaurant_id");
-            sel.innerHTML     = '<option value="">Select your Restaurant...</option>';
-            restaurants.forEach(r => {
+            const response = await fetch("http://localhost:5000/api/restaurant");
+            const data     = await response.json();
+            const sel      = document.getElementById("restaurant_id");
+
+            if (!response.ok || !Array.isArray(data)) {
+                // Server responded but with an error object (e.g. DB
+                // unreachable) rather than an array of restaurants.
+                throw new Error(data.error || 'Server did not return a restaurant list.');
+            }
+
+            sel.innerHTML  = '<option value="">Select your Restaurant...</option>';
+            data.forEach(r => {
                 const opt       = document.createElement("option");
                 opt.value       = r.restaurant_id;
                 opt.textContent = `${r.name} (${r.location})`;

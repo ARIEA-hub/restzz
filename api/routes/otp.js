@@ -5,6 +5,7 @@
 const express    = require('express');
 const router     = express.Router();
 const nodemailer = require('nodemailer');
+const bcrypt     = require('bcrypt');
 const db         = require('../database');
 
 // Shared in-memory OTP store (in production use Redis) — see
@@ -134,9 +135,108 @@ router.post('/verify-otp', async (req, res) => {
             redirect
         });
 
-    } catch (error) {
+        } catch (error) {
         console.error('[Verify OTP DB Error]', error.message);
         res.status(500).json({ success: false, message: 'Verification succeeded but database update failed. Please contact support.' });
+    }
+});
+
+// ── POST /api/forgot-password ──────────────────────────────────────
+// Body: { email, role }  — role is 'customer' or 'admin'.
+// Always responds the same way whether or not the email exists, so
+// this endpoint can't be used to check which emails are registered.
+router.post('/forgot-password', async (req, res) => {
+    const { email, role } = req.body;
+
+    if (!email || !role) {
+        return res.status(400).json({ success: false, message: 'Email and role are required.' });
+    }
+
+    const table  = role === 'admin' ? 'admin' : 'customer';
+    const idCol  = role === 'admin' ? 'admin_id' : 'customer_id';
+
+    try {
+        const [rows] = await db.query(`SELECT ${idCol}, name FROM ${table} WHERE email = $1`, [email]);
+
+        if (rows.length > 0) {
+            const otp = Math.floor(100000 + Math.random() * 900000);
+            const expiryMins = parseInt(process.env.OTP_EXPIRY_MINS || '10');
+            // purpose: 'reset' distinguishes this from a registration OTP
+            // sitting under the same email key in the shared store.
+            otpStore[email] = {
+                otp,
+                role,
+                purpose: 'reset',
+                expiresAt: Date.now() + (expiryMins * 60 * 1000)
+            };
+
+            await transporter.sendMail({
+                from: `"Q-Sense" <${process.env.EMAIL_USER}>`,
+                to: email,
+                subject: 'Reset your Q-Sense password',
+                html: `
+                    <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;border:1px solid #e1e8ed;border-radius:10px;overflow:hidden;">
+                        <div style="background:#3178c6;padding:20px;text-align:center;color:white;">
+                            <h2 style="margin:0;">Password Reset Requested</h2>
+                        </div>
+                        <div style="padding:30px;text-align:center;">
+                            <p>Hi ${rows[0].name},</p>
+                            <p>Use this code to reset your Q-Sense password. It expires in ${expiryMins} minutes.</p>
+                            <p style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#3178c6;">${otp}</p>
+                            <p style="color:#888;font-size:13px;">If you didn't request this, you can safely ignore this email.</p>
+                        </div>
+                    </div>
+                `
+            });
+        }
+
+        // Same response either way — prevents email enumeration
+        res.json({ success: true, message: 'If that email is registered, a reset code has been sent.' });
+
+    } catch (error) {
+        console.error('[Forgot Password Error]', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ── POST /api/reset-password ───────────────────────────────────────
+// Body: { email, otp, newPassword, role }
+router.post('/reset-password', async (req, res) => {
+    const { email, otp, newPassword, role } = req.body;
+
+    if (!email || !otp || !newPassword || !role) {
+        return res.status(400).json({ success: false, message: 'Email, code, new password, and role are required.' });
+    }
+    if (newPassword.length < 8) {
+        return res.status(400).json({ success: false, message: 'New password must be at least 8 characters.' });
+    }
+
+    const record = otpStore[email];
+
+    if (!record || record.purpose !== 'reset') {
+        return res.status(400).json({ success: false, message: 'No password reset was requested for this email. Request a new code.' });
+    }
+    if (Date.now() > record.expiresAt) {
+        delete otpStore[email];
+        return res.status(400).json({ success: false, message: 'Reset code expired. Please request a new one.' });
+    }
+    if (String(record.otp) !== String(otp)) {
+        return res.status(400).json({ success: false, message: 'Incorrect reset code.' });
+    }
+
+    const table = role === 'admin' ? 'admin' : 'customer';
+
+    try {
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+        await db.query(`UPDATE ${table} SET password = $1 WHERE email = $2`, [hashedPassword, email]);
+
+        delete otpStore[email];
+
+        res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
+
+    } catch (error) {
+        console.error('[Reset Password Error]', error.message);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
