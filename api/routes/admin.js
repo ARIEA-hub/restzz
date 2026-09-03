@@ -163,6 +163,97 @@ router.get('/reservations/pending/:restaurantId', async (req, res) => {
     }
 });
 
+// ── GET /api/admin/reservations/restaurant/:restaurantId ────────────
+router.get('/reservations/restaurant/:restaurantId', async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT
+                r.reserve_id,
+                c.name AS customer_name,
+                c.phone,
+                r.group_size,
+                r.status,
+                TO_CHAR(r.reserve_date, 'FMMonth FMDD, YYYY') AS date,
+                TO_CHAR(r.reserve_time::time, 'HH12:MI AM') AS time,
+                t.table_no
+            FROM reservation r
+            JOIN customer c ON r.customer_id = c.customer_id
+            LEFT JOIN restaurant_tables t ON r.table_id = t.table_id
+            WHERE r.restaurant_id = $1
+            ORDER BY r.reserve_date DESC, r.reserve_time DESC
+        `, [req.params.restaurantId]);
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching restaurant reservations:', error);
+        res.status(500).json({ message: 'Failed to fetch restaurant reservations.' });
+    }
+});
+
+// ── POST /api/admin/reservations/auto-allocate/:restaurantId ────────
+// Assigns the earliest unassigned reservation to the smallest suitable free table.
+router.post('/reservations/auto-allocate/:restaurantId', async (req, res) => {
+    const client = await db.getClient();
+    try {
+        await client.query('BEGIN');
+
+        const reservationResult = await client.query(
+            `SELECT reserve_id, group_size
+             FROM reservation
+             WHERE restaurant_id = $1
+               AND status = 'reserved'
+               AND table_id IS NULL
+             ORDER BY reserve_date ASC, reserve_time ASC
+             LIMIT 1
+             FOR UPDATE SKIP LOCKED`,
+            [req.params.restaurantId]
+        );
+
+        if (reservationResult.rows.length === 0) {
+            await client.query('COMMIT');
+            client.release();
+            return res.json({ allocated: false, message: 'No unassigned reservations are waiting.' });
+        }
+
+        const reservation = reservationResult.rows[0];
+        const tableResult = await client.query(
+            `SELECT table_id, table_no, capacity
+             FROM restaurant_tables
+             WHERE restaurant_id = $1
+               AND status = 'vacant'
+               AND capacity >= $2
+             ORDER BY capacity ASC, table_no ASC
+             LIMIT 1
+             FOR UPDATE SKIP LOCKED`,
+            [req.params.restaurantId, reservation.group_size]
+        );
+
+        if (tableResult.rows.length === 0) {
+            await client.query('COMMIT');
+            client.release();
+            return res.json({ allocated: false, message: 'No suitable free table is available for the next reservation.' });
+        }
+
+        const table = tableResult.rows[0];
+        await client.query(
+            'UPDATE reservation SET table_id = $1 WHERE reserve_id = $2',
+            [table.table_id, reservation.reserve_id]
+        );
+        await client.query(
+            "UPDATE restaurant_tables SET status = 'reserved' WHERE table_id = $1",
+            [table.table_id]
+        );
+
+        await client.query('COMMIT');
+        client.release();
+        res.json({ allocated: true, reserve_id: reservation.reserve_id, table_no: table.table_no });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        client.release();
+        console.error('Auto reservation allocation error:', error);
+        res.status(500).json({ message: 'Failed to auto-allocate reservation.' });
+    }
+});
+
 // ── PUT /api/admin/reservations/:reserveId/allocate ──────────────────
 // Transaction rewritten with proper pg client (getClient) pattern
 router.put('/reservations/:reserveId/allocate', async (req, res) => {

@@ -49,6 +49,12 @@
         .content-section.active { display: block; } 
 
         .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e1e8ed; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .reservation-management-list { display: grid; gap: 12px; }
+        .reservation-management-item { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 16px; border: 1px solid #e1e8ed; border-radius: 8px; background: #fbfdff; }
+        .reservation-management-item h3 { margin: 0 0 6px; color: #3178c6; font-size: 1rem; }
+        .reservation-management-item p { margin: 3px 0; color: #667085; font-size: .9rem; }
+        .reservation-status { display: inline-block; margin-top: 6px; padding: 4px 8px; border-radius: 999px; background: #eef5fb; color: #3178c6; font-size: .75rem; font-weight: 700; text-transform: capitalize; }
+        .reservation-management-item a { flex: 0 0 auto; padding: 9px 12px; border-radius: 6px; background: #3178c6; color: #fff; text-decoration: none; font-weight: 600; font-size: .85rem; }
 
         @media (max-width: 800px) {
             .top-nav { flex-wrap: wrap; gap: 12px; padding: 12px 18px; }
@@ -64,6 +70,7 @@
         <nav class="nav-links">
             <a href="#table-management" class="active" onclick="switchTabFromTop(event, 'table-management', this)">Overview</a>
             <a href="AdminTableManagement.html">Tables</a>
+            <a href="#reservations" onclick="switchTabFromTop(event, 'reservations', this)">Reservations</a>
             <a href="#live-queue" onclick="switchTabFromTop(event, 'live-queue', this)">Queue</a>
         </nav>
         <div class="profile-menu">
@@ -95,6 +102,9 @@
             <div class="nav-item active" data-tab="table-management" onclick="switchTab('table-management', this)">
                 📊 Table Management
             </div>
+            <div class="nav-item" data-tab="reservations" onclick="switchTab('reservations', this)">
+                📅 Reservations
+            </div>
             <div class="nav-item" data-tab="live-queue" onclick="switchTab('live-queue', this)">
                 🚶 Live Queue
             </div>
@@ -113,17 +123,33 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="color: #3178c6; margin: 0;">Pending Reservations</h3>
-                    
-                    <button onclick="window.location.href='AdminTableManagement.html'" 
-                            style="background: #fff; border: 2px solid #3178c6; color: #3178c6; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s;"
-                            onmouseover="this.style.background='#3178c6'; this.style.color='#fff';"
-                            onmouseout="this.style.background='#fff'; this.style.color='#3178c6';">
-                        🗺️ View Floor Plan
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="aiAllocateReservation()" style="background: #3178c6; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 600;">🤖 AI Allocate</button>
+                        <button onclick="window.location.href='AdminTableManagement.html'" 
+                                style="background: #fff; border: 2px solid #3178c6; color: #3178c6; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s;"
+                                onmouseover="this.style.background='#3178c6'; this.style.color='#fff';"
+                                onmouseout="this.style.background='#fff'; this.style.color='#3178c6';">
+                            🗺️ View Floor Plan
+                        </button>
+                    </div>
                 </div>
                 
                 <p style="color: #666; margin-bottom: 20px;">Assign incoming reservations to available tables.</p>
                 <div id="pending-reservations-list"></div>
+            </div>
+        </section>
+
+        <section id="reservations" class="content-section">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="color: #3178c6; margin: 0;">Reservation Management</h3>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="aiAllocateReservation()" style="background: #3178c6; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">🤖 AI Allocate Next</button>
+                        <button onclick="loadRestaurantReservations(localStorage.getItem('restaurant_id'))" style="background: #fff; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer;">🔄 Refresh</button>
+                    </div>
+                </div>
+                <p style="color: #666; margin-bottom: 20px;">Review bookings, statuses, and assigned table numbers.</p>
+                <div id="restaurant-reservations-list" class="reservation-management-list"></div>
             </div>
         </section>
 
@@ -232,6 +258,7 @@
             }
 
             await loadPendingReservations(restaurantId);
+            await loadRestaurantReservations(restaurantId);
             await loadLiveQueue(restaurantId);
         });
 
@@ -253,7 +280,7 @@
                     listContainer.innerHTML = `
                         <div style="padding: 40px 20px; background: #eef5fb; border-radius: 8px; text-align: center; border: 1px dashed #b8d4f2;">
                             <h3 style="color: #3178c6; margin-bottom: 10px;">🎉 All caught up!</h3>
-                            <p style="color: #666; margin-bottom: 20px;">There are no pending walk-ins or reservations waiting for a table.</p>
+                            <p style="color: #666; margin-bottom: 20px;">There are no unassigned reservations waiting for a table.</p>
                             <button onclick="window.location.href='AdminTableManagement.html'" 
                                     style="background: #3178c6; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 6px rgba(49,120,198,0.2);">
                                 Go to Table Management ➡
@@ -288,6 +315,54 @@
             } catch (error) {
                 console.error("Error fetching reservations:", error);
                 listContainer.innerHTML = "<p style='color: #d9534f; font-weight: bold;'>Failed to load reservations. Check console.</p>";
+            }
+        }
+
+        async function loadRestaurantReservations(restaurantId) {
+            const list = document.getElementById('restaurant-reservations-list');
+            if (!list) return;
+            list.innerHTML = '<p style="color: #666;">Loading reservations...</p>';
+            try {
+                const res = await fetch(`http://localhost:5000/api/admin/reservations/restaurant/${restaurantId}`);
+                const reservations = await res.json();
+                if (!res.ok || !Array.isArray(reservations)) throw new Error(reservations.message || 'Failed to load reservations.');
+                if (!reservations.length) {
+                    list.innerHTML = '<div class="empty-state">No reservations found for this restaurant.</div>';
+                    return;
+                }
+                list.innerHTML = '';
+                reservations.forEach((reservation) => {
+                    const item = document.createElement('article');
+                    item.className = 'reservation-management-item';
+                    const tableText = reservation.table_no ? `Table ${reservation.table_no}` : 'Table not assigned';
+                    const action = reservation.table_no ? '' : `<a href="AdminTableManagement.html?reserve_id=${reservation.reserve_id}&party_size=${reservation.group_size}">Allocate Table</a>`;
+                    item.innerHTML = `<div><h3>${reservation.customer_name}</h3><p>${reservation.date} at ${reservation.time} · Party of ${reservation.group_size}</p><p>${tableText}</p><span class="reservation-status">${reservation.status}</span></div>${action}`;
+                    list.appendChild(item);
+                });
+            } catch (error) {
+                console.error('Reservation management error:', error);
+                list.innerHTML = `<p style="color: #d9534f;">${error.message}</p>`;
+            }
+        }
+
+        async function aiAllocateReservation() {
+            const restaurantId = localStorage.getItem('restaurant_id');
+            try {
+                const res = await fetch(`http://localhost:5000/api/admin/reservations/auto-allocate/${restaurantId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'AI allocation failed.');
+                if (data.allocated) {
+                    alert(`Reservation allocated to table ${data.table_no}.`);
+                    await loadRestaurantReservations(restaurantId);
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('AI reservation allocation error:', error);
+                alert(error.message);
             }
         }
 
