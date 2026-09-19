@@ -96,12 +96,13 @@ function startLocationTracking() {
                 if (userMarker) {
                     userMarker.setLatLng([latitude, longitude]);
                 } else {
-                    // Create a distinct blue marker for the user
+                    // Create a smiley pin for the user's live location
                     const userIcon = L.divIcon({
                         className: 'user-location-marker',
-                        html: '<div style="width:14px;height:14px;background:#3178c6;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>',
-                        iconSize: [14, 14],
-                        iconAnchor: [7, 7]
+                        html: '<div style="position:relative;width:48px;height:48px;filter:drop-shadow(0 2px 2px rgba(66,37,99,.45));"><span style="position:absolute;inset:0;color:#aa8bcb;font-family:Arial,sans-serif;font-size:52px;line-height:44px;-webkit-text-stroke:2px #5c3d82;text-shadow:0 0 0 #5c3d82;">♥</span></div>',
+                        iconSize: [48, 48],
+                        iconAnchor: [24, 48],
+                        popupAnchor: [0, -48]
                     });
                     userMarker = L.marker([latitude, longitude], { icon: userIcon })
                         .addTo(map)
