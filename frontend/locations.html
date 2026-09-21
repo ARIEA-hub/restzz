@@ -369,6 +369,7 @@
         ];
 
         let markers = [];
+        let walkingRoute;
 
         function renderData(data) {
     
@@ -380,16 +381,11 @@
 
             data.forEach(res => {
                 
-                let markerColor = res.tablesAvailable > 0 ? "blue" : "red";
-                let availabilityText = res.tablesAvailable > 0 ? `${res.tablesAvailable} Tables Available` : `Fully Booked`;
-
-          
                 let marker = L.marker([res.lat, res.lng]).addTo(map)
                 .bindPopup(`
                              <div class="popup-content">
                                 <h4>${res.name}</h4>
                                  <p>${res.cuisine} &bull; ${res.distance} km away</p>
-                                 <span class="tables-badge" style="${res.tablesAvailable === 0 ? 'background:#fdf2f2; color:#d9534f; border-color:#d9534f;' : ''}">${availabilityText}</span>
                                  <br><br>
                                   <div style="display: flex; gap: 8px; flex-direction: column;">
                                     <button class="popup-btn" onclick="window.location.href='CustomerReservation.html?restaurant_id=${res.id}'">
@@ -397,6 +393,9 @@
                                     </button>
                                     <button class="popup-btn" style="background: #f8f9fa; color: #3178c6; border: 1px solid #3178c6;" onclick="window.location.href='JoinQueue.html?restaurant_id=${res.id}'">
                                         🚶 Join Live Queue
+                                    </button>
+                                    <button class="popup-btn route-btn" onclick='showWalkingRoute(${res.lat}, ${res.lng}, ${JSON.stringify(res.name)})'>
+                                        Route
                                     </button>
             </div>
         </div>
@@ -407,7 +406,6 @@
                     <div class="restaurant-card" onclick="focusOnMap(${res.lat}, ${res.lng})">
                         <h3>${res.name}</h3>
                         <p>${res.cuisine} &bull; ${res.distance} km away</p>
-                        <span class="tables-badge" style="${res.tablesAvailable === 0 ? 'background:#fdf2f2; color:#d9534f; border-color:#d9534f;' : ''}">${availabilityText}</span>
                     </div>
                 `;
             });
@@ -433,8 +431,90 @@
             map.flyTo([lat, lng], 17, { animate: true, duration: 1 });
         }
 
+        function distanceFromUser(lat, lng) {
+            const earthRadiusKm = 6371;
+            const toRadians = degrees => degrees * Math.PI / 180;
+            const latDifference = toRadians(lat - userLocation.lat);
+            const lngDifference = toRadians(lng - userLocation.lng);
+            const a = Math.sin(latDifference / 2) ** 2
+                + Math.cos(toRadians(userLocation.lat)) * Math.cos(toRadians(lat))
+                * Math.sin(lngDifference / 2) ** 2;
+            return Math.round(earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+        }
+
+        // Keep the map in sync with restaurants added through the admin flow.
+        async function loadRegisteredRestaurants() {
+            try {
+                const response = await fetch('http://localhost:5000/api/restaurant');
+                if (!response.ok) throw new Error('Restaurant API request failed');
+
+                const registeredRestaurants = await response.json();
+                const restaurantsByName = new Map(restaurants.map(restaurant => [restaurant.name.toLowerCase(), restaurant]));
+
+                registeredRestaurants
+                    .filter(restaurant => restaurant.latitude != null && restaurant.longitude != null)
+                    .forEach(restaurant => {
+                        const lat = Number(restaurant.latitude);
+                        const lng = Number(restaurant.longitude);
+                        restaurantsByName.set(restaurant.name.toLowerCase(), {
+                            id: restaurant.restaurant_id,
+                            name: restaurant.name,
+                            lat,
+                            lng,
+                            cuisine: 'Other',
+                            tablesAvailable: restaurant.status === 'open' ? 1 : 0,
+                            distance: distanceFromUser(lat, lng)
+                        });
+                    });
+
+                restaurants = Array.from(restaurantsByName.values());
+                applyFilters();
+            } catch (error) {
+                // The static entries keep the page usable when the local API is offline.
+                console.warn('Registered restaurants could not be loaded:', error);
+            }
+        }
+
+        // Draw a pedestrian route from the "You are here" marker to the selected restaurant.
+        async function showWalkingRoute(destinationLat, destinationLng, restaurantName) {
+            if (walkingRoute) {
+                map.removeLayer(walkingRoute);
+            }
+
+            const fallbackRoute = () => {
+                walkingRoute = L.polyline(
+                    [[userLocation.lat, userLocation.lng], [destinationLat, destinationLng]],
+                    { color: '#3178c6', weight: 5, opacity: 0.85, dashArray: '8 8' }
+                ).addTo(map);
+                map.fitBounds(walkingRoute.getBounds(), { padding: [40, 40] });
+                alert(`Walking directions are unavailable right now. Showing the direct path to ${restaurantName}.`);
+            };
+
+            try {
+                const routeUrl = `https://routing.openstreetmap.de/routed-foot/route/v1/driving/${userLocation.lng},${userLocation.lat};${destinationLng},${destinationLat}?overview=full&geometries=geojson`;
+                const response = await fetch(routeUrl);
+                const routeData = await response.json();
+
+                if (!response.ok || !routeData.routes || !routeData.routes.length) {
+                    throw new Error('No walking route returned');
+                }
+
+                const routePoints = routeData.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+                walkingRoute = L.polyline(routePoints, {
+                    color: '#3178c6',
+                    weight: 5,
+                    opacity: 0.85
+                }).addTo(map);
+                map.fitBounds(walkingRoute.getBounds(), { padding: [40, 40] });
+            } catch (error) {
+                console.warn('Walking route could not be loaded:', error);
+                fallbackRoute();
+            }
+        }
+
         // Initial render on page load
         renderData(restaurants);
+        loadRegisteredRestaurants();
 
 
     const profileToggle = document.getElementById('profileToggle');
