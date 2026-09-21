@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../database.js');
 const { GoogleGenAI } = require('@google/genai');
 const jwt = require('jsonwebtoken');
+const { rankByConvenience } = require('../utils/scoring');
 
 const ai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
@@ -264,6 +265,295 @@ router.post('/message', async (req, res, next) => {
         }
 
         next(error);
+    }
+});
+
+
+// ============================================================
+// Function-calling: let the chatbot actually book a table or
+// join a queue, instead of only answering questions about them.
+// ============================================================
+function extractFunctionCall(response) {
+    if (!response) return null;
+
+    if (Array.isArray(response.functionCalls) && response.functionCalls.length > 0) {
+        return response.functionCalls[0];
+    }
+
+    const candidates = response.candidates || response.response?.candidates || [];
+    for (const candidate of candidates) {
+        const parts = candidate?.content?.parts || candidate?.parts || [];
+        for (const part of parts) {
+            if (part?.functionCall) return part.functionCall;
+        }
+    }
+    return null;
+}
+
+function resolveRestaurantByName(name, restaurantRows) {
+    if (!name) return null;
+    const normalized = name.trim().toLowerCase();
+
+    let match = restaurantRows.find((r) => r.name.toLowerCase() === normalized);
+    if (match) return match;
+
+    match = restaurantRows.find((r) =>
+        r.name.toLowerCase().includes(normalized) || normalized.includes(r.name.toLowerCase())
+    );
+    return match || null;
+}
+
+const bookTableDeclaration = {
+    name: 'book_table',
+    description: 'Books a table reservation for the currently logged-in customer at a specific restaurant, date, and time.',
+    parameters: {
+        type: 'OBJECT',
+        properties: {
+            restaurant_name: { type: 'STRING', description: "The restaurant's name, as the user said it." },
+            group_size: { type: 'INTEGER', description: 'Number of people in the party.' },
+            reserve_date: { type: 'STRING', description: 'Reservation date in YYYY-MM-DD format. Resolve relative dates like "tonight" or "tomorrow" to an actual date.' },
+            reserve_time: { type: 'STRING', description: 'Reservation time in 24-hour HH:MM format.' }
+        },
+        required: ['restaurant_name', 'group_size', 'reserve_date', 'reserve_time']
+    }
+};
+
+const joinQueueDeclaration = {
+    name: 'join_queue',
+    description: 'Joins the currently logged-in customer to the live walk-in waitlist at a specific restaurant, right now.',
+    parameters: {
+        type: 'OBJECT',
+        properties: {
+            restaurant_name: { type: 'STRING', description: "The restaurant's name, as the user said it." },
+            group_size: { type: 'INTEGER', description: 'Number of people in the party.' }
+        },
+        required: ['restaurant_name', 'group_size']
+    }
+};
+
+// ── POST /api/chatbots/action ────────────────────────────────────────
+// Separate from /message (which stays pure Q&A) so this higher-stakes,
+// harder-to-fully-verify-offline path can't destabilize the working
+// chatbot. Requires login — booking/joining a queue always needs a
+// real customer_id.
+//
+// NOTE: function-calling response shapes can vary slightly between
+// @google/genai SDK versions. extractFunctionCall() above checks both
+// the convenience `.functionCalls` array and the raw candidates/parts
+// structure defensively, but this endpoint hasn't been exercised
+// against a live API key in this environment (no network access here)
+// — test it for real before relying on it, same caution as any new
+// third-party API integration.
+router.post('/action', async (req, res) => {
+    try {
+        const { message } = req.body;
+        const authorization = req.headers.authorization || '';
+        const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+
+        if (!token) {
+            return res.status(401).json({ error: 'Please log in to book a table or join a queue through the chatbot.' });
+        }
+
+        let customerId;
+        try {
+            customerId = jwt.verify(token, process.env.JWT_SECRET).customer_id;
+        } catch (error) {
+            return res.status(401).json({ error: 'Your session has expired. Please log in again.' });
+        }
+
+        if (!message || typeof message !== 'string' || !message.trim()) {
+            return res.status(400).json({ error: 'Message content is required.' });
+        }
+
+        if (!ai) {
+            return res.status(500).json({ error: 'GEMINI_API_KEY is not configured.' });
+        }
+
+        const [restaurantRows] = await db.query(
+            `SELECT restaurant_id, name, status FROM restaurant WHERE status = 'open'`
+        );
+
+        const response = await ai.models.generateContent({
+            model,
+            contents: message,
+            config: {
+                systemInstruction: `You help customers book tables or join waitlists at Q-Sense restaurants.
+                    Today's date context matters for resolving "tonight"/"tomorrow" — assume the user means
+                    the near future, not a past date.
+                    Open restaurants right now: ${restaurantRows.map((r) => r.name).join(', ') || 'none currently open'}.
+                    If the user's message clearly requests booking a table or joining a queue, call the
+                    matching function. If required details are missing (date, time, or party size), do NOT
+                    call a function — ask a brief clarifying question in plain text instead.
+                    If the message isn't a booking/queue request, respond normally in plain text.`,
+                tools: [{ functionDeclarations: [bookTableDeclaration, joinQueueDeclaration] }],
+                maxOutputTokens: 300,
+                temperature: 0.1
+            }
+        });
+
+        const functionCall = extractFunctionCall(response);
+
+        if (!functionCall) {
+            const reply = extractReplyText(response) || "Could you clarify what you'd like to do?";
+            return res.json({ reply, action: null });
+        }
+
+        const args = functionCall.args || {};
+        const restaurant = resolveRestaurantByName(args.restaurant_name, restaurantRows);
+
+        if (!restaurant) {
+            return res.json({
+                reply: `I couldn't find an open restaurant matching "${args.restaurant_name || 'that name'}". Could you double-check the name?`,
+                action: null
+            });
+        }
+
+        if (functionCall.name === 'book_table') {
+            const { group_size, reserve_date, reserve_time } = args;
+            if (!group_size || !reserve_date || !reserve_time) {
+                const missing = [!group_size && 'party size', !reserve_date && 'date', !reserve_time && 'time']
+                    .filter(Boolean).join(', ');
+                return res.json({ reply: `To book at ${restaurant.name}, I still need the ${missing}.`, action: null });
+            }
+
+            await db.query(
+                `INSERT INTO reservation (customer_id, restaurant_id, group_size, reserve_date, reserve_time)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [customerId, restaurant.restaurant_id, group_size, reserve_date, reserve_time]
+            );
+
+            return res.json({
+                reply: `Booked! A table for ${group_size} at ${restaurant.name} on ${reserve_date} at ${reserve_time}.`,
+                action: { type: 'book_table', restaurant_id: restaurant.restaurant_id }
+            });
+        }
+
+        if (functionCall.name === 'join_queue') {
+            const { group_size } = args;
+            if (!group_size) {
+                return res.json({ reply: `How many people are in your party for ${restaurant.name}?`, action: null });
+            }
+
+            const [existing] = await db.query(
+                `SELECT queue_id FROM queue WHERE customer_id = $1 AND restaurant_id = $2 AND status IN ('waiting', 'called')`,
+                [customerId, restaurant.restaurant_id]
+            );
+            if (existing.length > 0) {
+                return res.json({ reply: `You're already in the queue at ${restaurant.name}.`, action: null });
+            }
+
+            const [rows] = await db.query(
+                `INSERT INTO queue (restaurant_id, customer_id, group_size) VALUES ($1, $2, $3) RETURNING queue_id`,
+                [restaurant.restaurant_id, customerId, group_size]
+            );
+
+            return res.json({
+                reply: `You're in! Joined the queue at ${restaurant.name} for ${group_size}.`,
+                action: { type: 'join_queue', restaurant_id: restaurant.restaurant_id, queue_id: rows[0].queue_id }
+            });
+        }
+
+        res.json({ reply: "I understood a request but couldn't complete it. Please try the Reservation or Join Queue page directly.", action: null });
+
+    } catch (error) {
+        console.error('Chatbot action error:', error);
+        res.status(500).json({ error: 'Something went wrong processing that request.' });
+    }
+});
+
+// ============================================================
+// Natural-language search: Gemini parses free-text into REAL
+// structured filters (only fields that actually exist in the
+// schema — no "cuisine", that column doesn't exist). The actual
+// filtering below is plain SQL/JS; Gemini only does the parsing.
+// ============================================================
+
+// ── POST /api/chatbots/search ────────────────────────────────────────
+// Body: { query: "quiet place for 2 with a table free soon", lat, lng (optional) }
+router.post('/search', async (req, res) => {
+    const { query, lat, lng } = req.body;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+        return res.status(400).json({ error: 'A search query is required.' });
+    }
+
+    if (!ai) {
+        return res.status(500).json({ error: 'GEMINI_API_KEY is not configured.' });
+    }
+
+    try {
+        const parsePrompt = `
+            Extract search filters from this restaurant search request: "${query}"
+
+            Respond with ONLY a JSON object, no other text, in exactly this shape:
+            {
+              "party_size": <integer or null — number of people, if mentioned>,
+              "max_wait_minutes": <integer or null — max acceptable wait in minutes. "quick"/"no wait"/"fast" implies roughly 10-15>,
+              "keyword": <string or null — a restaurant name or area to text-search for, if mentioned. Do not invent one>
+            }
+            If a field isn't mentioned or implied, use null for it. Include only these three fields.
+        `;
+
+        const response = await ai.models.generateContent({
+            model,
+            contents: parsePrompt,
+            config: { responseMimeType: 'application/json', maxOutputTokens: 150, temperature: 0 }
+        });
+
+        const rawText = extractReplyText(response);
+        let filters = {};
+        try {
+            filters = JSON.parse(rawText);
+        } catch (parseError) {
+            console.error('Could not parse Gemini search filters, raw text was:', rawText);
+        }
+
+        // Never trust the model's output shape blindly — validate/clamp
+        // every field ourselves before using it in a query.
+        const party_size = Number.isInteger(filters.party_size) ? filters.party_size : null;
+        const max_wait_minutes = Number.isInteger(filters.max_wait_minutes) ? filters.max_wait_minutes : null;
+        const keyword = typeof filters.keyword === 'string' && filters.keyword.trim() ? filters.keyword.trim() : null;
+
+        const conditions = [`r.status = 'open'`];
+        const params = [];
+        if (keyword) {
+            params.push(`%${keyword}%`);
+            conditions.push(`(r.name ILIKE $${params.length} OR r.location ILIKE $${params.length})`);
+        }
+
+        const [rows] = await db.query(`
+            SELECT r.restaurant_id, r.name, r.location, r.latitude, r.longitude,
+                   COUNT(t.table_id) FILTER (WHERE t.status = 'vacant') AS vacant_tables,
+                   COUNT(q.queue_id) FILTER (WHERE q.status = 'waiting') AS waiting_count
+            FROM restaurant r
+            LEFT JOIN restaurant_tables t ON t.restaurant_id = r.restaurant_id
+            LEFT JOIN queue q ON q.restaurant_id = r.restaurant_id
+            WHERE ${conditions.join(' AND ')}
+            GROUP BY r.restaurant_id
+            ORDER BY r.name ASC
+        `, params);
+
+        let results = rows.map((r) => ({ ...r, estimated_wait_min: (r.waiting_count || 0) * 5 }));
+
+        if (party_size) {
+            // We don't track free tables by exact capacity size per
+            // party here, only "has at least one vacant table" — a
+            // real capacity-aware match is a reasonable future add-on.
+            results = results.filter((r) => r.vacant_tables > 0);
+        }
+        if (max_wait_minutes != null) {
+            results = results.filter((r) => r.estimated_wait_min <= max_wait_minutes);
+        }
+
+        if (lat != null && lng != null) {
+            results = rankByConvenience(parseFloat(lat), parseFloat(lng), results);
+        }
+
+        res.json({ filters: { party_size, max_wait_minutes, keyword }, results });
+
+    } catch (error) {
+        console.error('Search parsing error:', error.message);
+        res.status(500).json({ error: 'Failed to process search.' });
     }
 });
 
