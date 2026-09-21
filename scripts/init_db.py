@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS reservation (
     reserve_date    DATE            NOT NULL,
     reserve_time    TIME            NOT NULL,
     status          VARCHAR(20)     DEFAULT 'reserved'
-                    CHECK (status IN ('reserved','seated','cancelled','completed')),
+                    CHECK (status IN ('reserved','seated','cancelled','completed','no_show')),
     created_at      TIMESTAMPTZ     DEFAULT NOW()
 );
 

@@ -320,6 +320,7 @@
             <div class="filter-group">
                 <label>Distance from me</label>
                 <select id="distanceFilter" onchange="applyFilters()">
+                    <option value="none" selected>None - Show all restaurants</option>
                     <option value="5">Within 5 km</option>
                     <option value="3">Within 3 km</option>
                     <option value="1">Within 1 km</option>
@@ -358,12 +359,13 @@
             .bindPopup('<b>You are here</b><br>Bandra, Mumbai').openPopup();
 
    
-        const restaurants = [
+        let restaurants = [
             { id: 4, name: "Foo Bandra", lat: 19.060038, lng: 72.836275, cuisine: "Asian", tablesAvailable: 4, distance: 0.2 },
             { id: 5, name: "Bandra Born", lat: 19.050472, lng: 72.826998, cuisine: "Indian", tablesAvailable: 12, distance: 1.8 },
             { id: 6, name: "Veranda Bandra", lat: 19.066789, lng: 72.830283, cuisine: "Indian", tablesAvailable: 2, distance: 0.8 },
             { id: 7, name: "The Nest Bandra", lat: 19.056281, lng: 72.834321, cuisine: "Continental", tablesAvailable: 8, distance: 0.5 },
-            { id: 8, name: "Copper Chimney", lat: 19.060868, lng: 72.836597, cuisine: "Indian", tablesAvailable: 0, distance: 0.3 }
+            { id: 8, name: "Copper Chimney", lat: 19.060868, lng: 72.836597, cuisine: "Indian", tablesAvailable: 0, distance: 0.3 },
+            { id: 9, name: "Q-Sense HQ Diner", lat: 19.1176, lng: 72.9060, cuisine: "Continental", tablesAvailable: 6, distance: 9.8 }
         ];
 
         let markers = [];
@@ -414,11 +416,12 @@
         // 4. Filtering Logic based on User Input
         function applyFilters() {
             const selectedCuisine = document.getElementById('cuisineFilter').value;
-            const maxDistance = parseFloat(document.getElementById('distanceFilter').value);
+            const selectedDistance = document.getElementById('distanceFilter').value;
+            const maxDistance = selectedDistance === 'none' ? null : parseFloat(selectedDistance);
 
             const filteredData = restaurants.filter(res => {
                 const cuisineMatch = selectedCuisine === "All" || res.cuisine === selectedCuisine;
-                const distanceMatch = res.distance <= maxDistance;
+                const distanceMatch = maxDistance === null || res.distance <= maxDistance;
                 return cuisineMatch && distanceMatch;
             });
 
