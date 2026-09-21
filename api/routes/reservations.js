@@ -65,4 +65,34 @@ router.delete('/:reserveId', async (req, res) => {
     }
 });
 
+// ── PATCH /api/reservations/:reserveId/status ────────────────────────
+// General admin status-setter — added so admins have a way to mark a
+// reservation as 'no_show', which previously had no path in the app at
+// all (only 'cancelled', via the customer-facing DELETE above). This is
+// what makes the admin customer-behavior-summary feature meaningful —
+// without a way to ever record a no-show, "no-show rate" could never
+// be anything but zero.
+router.patch('/:reserveId/status', async (req, res) => {
+    const { status } = req.body;
+    const validStatuses = ['reserved', 'seated', 'cancelled', 'completed', 'no_show'];
+
+    if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: `Status must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    try {
+        const [rows] = await db.query(
+            'UPDATE reservation SET status = $1 WHERE reserve_id = $2 RETURNING reserve_id',
+            [status, req.params.reserveId]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Reservation not found.' });
+        }
+        res.json({ success: true, message: `Reservation marked as ${status}.` });
+    } catch (error) {
+        console.error('Error updating reservation status:', error);
+        res.status(500).json({ message: 'Failed to update reservation status.' });
+    }
+});
+
 module.exports = router;

@@ -7,6 +7,10 @@ const db         = require('../database');
 const bcrypt     = require('bcrypt');
 const jwt        = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const { GoogleGenAI } = require('@google/genai');
+
+const ai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 // Shared in-memory OTP store — see api/utils/otpStore.js. Required (not a
 // locally-generated OTP) so that POST /api/verify-otp in otp.js can find
 // and validate the code generated below.
@@ -337,6 +341,111 @@ router.put('/reservations/:reserveId/allocate', async (req, res) => {
     } catch (error) {
         console.error('Post-transaction error:', error);
         res.status(500).json({ message: 'Table allocated but notification failed.' });
+    }
+});
+
+
+// ── GET /api/admin/customer-summary/:customerId ──────────────────────
+// Plain-language summary of a customer's booking behavior for admin
+// staff — real computed stats (not invented ones) narrated by Gemini.
+// This is the ONE place Gemini is used here: it only phrases numbers
+// that were already computed from the database, it doesn't decide or
+// invent anything about the customer.
+//
+// NOTE ON SCOPE: most other admin routes in this file currently have
+// NO JWT verification at all (a pre-existing gap from before this
+// change, not something introduced here) — this new endpoint adds
+// real admin-token verification since it's new code, but it's
+// currently the exception rather than the rule. Worth a dedicated
+// pass to add the same protection everywhere else.
+function getAuthenticatedAdmin(req) {
+    const authorization = req.headers.authorization || '';
+    if (!authorization.startsWith('Bearer ')) return null;
+    try {
+        return jwt.verify(authorization.slice(7), process.env.JWT_SECRET);
+    } catch (error) {
+        return null;
+    }
+}
+
+router.get('/customer-summary/:customerId', async (req, res) => {
+    const admin = getAuthenticatedAdmin(req);
+    if (!admin) {
+        return res.status(401).json({ message: 'Admin login required.' });
+    }
+
+    const customerId = req.params.customerId;
+
+    try {
+        const [customerRows] = await db.query(
+            'SELECT name, email, phone, created_at FROM customer WHERE customer_id = $1',
+            [customerId]
+        );
+        if (customerRows.length === 0) {
+            return res.status(404).json({ message: 'Customer not found.' });
+        }
+        const customer = customerRows[0];
+
+        const [reservationStats] = await db.query(`
+            SELECT status, COUNT(*) AS count, AVG(group_size) AS avg_party_size
+            FROM reservation
+            WHERE customer_id = $1
+            GROUP BY status
+        `, [customerId]);
+
+        const [queueStats] = await db.query(`
+            SELECT status, COUNT(*) AS count
+            FROM queue
+            WHERE customer_id = $1
+            GROUP BY status
+        `, [customerId]);
+
+        const totalReservations = reservationStats.reduce((sum, r) => sum + parseInt(r.count, 10), 0);
+        const noShowCount = parseInt(reservationStats.find((r) => r.status === 'no_show')?.count || 0, 10);
+        const completedCount = parseInt(reservationStats.find((r) => r.status === 'completed')?.count || 0, 10);
+        const cancelledCount = parseInt(reservationStats.find((r) => r.status === 'cancelled')?.count || 0, 10);
+        const avgPartySize = reservationStats.length
+            ? (reservationStats.reduce((sum, r) => sum + (parseFloat(r.avg_party_size) || 0) * parseInt(r.count, 10), 0) / (totalReservations || 1)).toFixed(1)
+            : null;
+        const noShowRate = totalReservations > 0 ? Math.round((noShowCount / totalReservations) * 100) : null;
+
+        const stats = {
+            total_reservations: totalReservations,
+            completed: completedCount,
+            cancelled: cancelledCount,
+            no_show: noShowCount,
+            no_show_rate_percent: noShowRate,
+            avg_party_size: avgPartySize,
+            queue_joins: queueStats.reduce((sum, q) => sum + parseInt(q.count, 10), 0),
+            queue_left_early: parseInt(queueStats.find((q) => q.status === 'left')?.count || 0, 10),
+            customer_since: customer.created_at
+        };
+
+        let summary = null;
+        if (ai) {
+            try {
+                const prompt = `Write a brief (under 50 words), plain-language summary of this customer's
+                    booking behavior for a restaurant staff member. Use ONLY these real numbers, don't
+                    invent anything: ${JSON.stringify(stats)}. If total_reservations is 0, just say they
+                    haven't booked yet. Be neutral and factual, not judgmental.`;
+
+                const response = await ai.models.generateContent({
+                    model: geminiModel,
+                    contents: prompt,
+                    config: { maxOutputTokens: 120, temperature: 0.2 }
+                });
+                summary = (response.text || '').trim() || null;
+            } catch (summaryError) {
+                console.error('Customer summary narration error:', summaryError.message);
+                // Stats are still useful without the narration — don't fail the request.
+            }
+        }
+
+        res.json({ customer: { name: customer.name, email: customer.email, phone: customer.phone }, stats, summary });
+
+    } catch (error) {
+        console.error('Error building customer summary:', error);
+        res.status(500).json({ message: 'Failed to build customer summary.' });
     }
 });
 
