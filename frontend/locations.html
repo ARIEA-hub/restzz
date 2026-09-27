@@ -188,6 +188,24 @@
             padding-right: 5px;
         }
 
+        /* Smart pick (expert system) */
+        .smart-pick { margin-bottom: 18px; padding: 14px; border: 1px solid #dfeaf5; border-radius: 12px; background: #f8fbff; }
+        .smart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .smart-head strong { color: #3178c6; white-space: nowrap; }
+        .smart-head select { padding: 5px 6px; border: 1px solid #ccc; border-radius: 6px; font: inherit; font-size: .85rem; }
+        .smart-muted { color: #667085; font-size: .8rem; margin: 6px 0 2px; }
+        .smart-item { border-top: 1px solid #e7edf3; padding: 8px 0; }
+        .smart-item summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+        .smart-item summary::-webkit-details-marker { display: none; }
+        .smart-name { font-weight: 600; color: #1a1a1a; }
+        .smart-tag { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #eef2f6; color: #555; font-size: .72rem; font-weight: 700; }
+        .smart-item.recommend_strongly .smart-tag { background: #3178c6; color: #fff; }
+        .smart-item.recommend .smart-tag { background: #dcebfa; color: #245ea3; }
+        .smart-item.avoid .smart-tag { background: #fdecea; color: #b3261e; }
+        .smart-why ul, .smart-why ol { margin: 2px 0 4px 18px; font-size: .82rem; color: #333; }
+        .smart-why li { margin: 2px 0; }
+        .smart-route { margin-top: 6px; padding: 6px 10px; border: 1px solid #3178c6; border-radius: 6px; background: #fff; color: #3178c6; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
+
         .restaurant-card {
             border: 1px solid #e1e8ed;
             padding: 15px;
@@ -306,6 +324,21 @@
     <main class="locations-wrapper">
         <aside class="sidebar">
             <h2>Find Nearby</h2>
+
+            <div class="smart-pick">
+                <div class="smart-head">
+                    <strong>Smart pick</strong>
+                    <select id="smartPartySize" onchange="loadSmartPick()" aria-label="Party size">
+                        <option value="1">1 guest</option>
+                        <option value="2" selected>2 guests</option>
+                        <option value="3">3 guests</option>
+                        <option value="4">4 guests</option>
+                        <option value="6">6 guests</option>
+                        <option value="8">8 guests</option>
+                    </select>
+                </div>
+                <div id="smartPick"><p class="smart-muted">Loading…</p></div>
+            </div>
             
             <div class="filter-group">
                 <label>Cuisine Type</label>
@@ -396,6 +429,9 @@
                                     </button>
                                     <button class="popup-btn route-btn" onclick='showWalkingRoute(${res.lat}, ${res.lng}, ${JSON.stringify(res.name)})'>
                                         Route
+                                    </button>
+                                    <button class="popup-btn route-btn" onclick='showSearchRoute(${res.id}, ${JSON.stringify(res.name)})'>
+                                        Hop route (A*)
                                     </button>
             </div>
         </div>
@@ -512,9 +548,80 @@
             }
         }
 
+
+        // ── Smart pick: rule-based expert system (forward chaining) ────────
+        const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+        const CONCLUSION_TEXT = {
+            recommend_strongly: 'Top pick',
+            recommend: 'Good pick',
+            consider: 'Possible',
+            avoid: 'Not ideal'
+        };
+
+        async function loadSmartPick() {
+            const box = document.getElementById('smartPick');
+            const partySize = document.getElementById('smartPartySize').value;
+            box.innerHTML = '<p class="smart-muted">Checking rules…</p>';
+            try {
+                const res = await fetch(`http://localhost:5000/api/restaurant/expert-recommend?party_size=${partySize}&lat=${userLocation.lat}&lng=${userLocation.lng}`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Recommendation failed');
+                const top = data.recommendations.slice(0, 3);
+                if (!top.length) {
+                    box.innerHTML = '<p class="smart-muted">No open restaurants right now.</p>';
+                    return;
+                }
+                box.innerHTML = top.map((r, i) => `
+                    <details class="smart-item ${r.conclusion}" ${i === 0 ? 'open' : ''}>
+                        <summary>
+                            <span class="smart-name">${escapeHtml(r.name)}</span>
+                            <span class="smart-tag">${CONCLUSION_TEXT[r.conclusion]}</span>
+                        </summary>
+                        <div class="smart-why">
+                            <div class="smart-muted">What we know right now</div>
+                            <ul>${r.base_facts.map((f) => `<li>${escapeHtml(f.detail)}</li>`).join('')}</ul>
+                            <div class="smart-muted">Why this conclusion</div>
+                            <ol>${r.derived.map((d) => `<li><strong>${d.rule}</strong> ${escapeHtml(d.text)}</li>`).join('') || '<li>No rule applied.</li>'}</ol>
+                            ${r.why_not_strong ? `<div class="smart-muted">Not a top pick because it is missing: ${escapeHtml([...new Set(r.why_not_strong.flatMap((w) => w.missing))].join(', ').replace(/_/g, ' '))}</div>` : ''}
+                            ${r.latitude != null ? `<button type="button" class="smart-route" onclick='showSearchRoute(${r.restaurant_id}, ${JSON.stringify(r.name)})'>Show hop route</button>` : ''}
+                        </div>
+                    </details>`).join('');
+            } catch (error) {
+                console.warn('Smart pick unavailable:', error);
+                box.innerHTML = '<p class="smart-muted">Recommendations are unavailable right now.</p>';
+            }
+        }
+
+        // ── Hop route: A* over the restaurant graph (UCS/Greedy compared) ──
+        async function showSearchRoute(restaurantId, restaurantName) {
+            if (walkingRoute) map.removeLayer(walkingRoute);
+            try {
+                const res = await fetch(`http://localhost:5000/api/restaurant/route?lat=${userLocation.lat}&lng=${userLocation.lng}&to=${restaurantId}&algorithm=compare&walk_km=5`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Route failed');
+                const { astar, ucs, greedy } = data.results;
+                if (!astar.found) {
+                    alert(`${restaurantName} can't be reached by hops of 5 km or less between restaurants.`);
+                    return;
+                }
+                walkingRoute = L.polyline(astar.path.map((p) => [p.lat, p.lng]), { color: '#3178c6', weight: 5, opacity: 0.85 }).addTo(map);
+                map.fitBounds(walkingRoute.getBounds(), { padding: [40, 40] });
+                walkingRoute.bindPopup(`
+                    <div class="popup-content">
+                        <h4>${escapeHtml(astar.path.map((p) => p.name).join(' → '))}</h4>
+                        <p>${astar.distance_km} km over ${astar.hops} hop${astar.hops === 1 ? '' : 's'} (straight line: ${astar.straight_line_km} km)</p>
+                        <p style="margin-top:6px;">Places checked to find this route: A* ${astar.nodes_expanded} · UCS ${ucs.nodes_expanded} · Greedy ${greedy.nodes_expanded}${greedy.distance_km !== astar.distance_km ? ` (Greedy's route is longer: ${greedy.distance_km} km)` : ''}</p>
+                    </div>`).openPopup();
+            } catch (error) {
+                console.warn('Hop route unavailable:', error);
+                alert('Hop route is unavailable right now.');
+            }
+        }
+
         // Initial render on page load
         renderData(restaurants);
         loadRegisteredRestaurants();
+        loadSmartPick();
 
 
     const profileToggle = document.getElementById('profileToggle');

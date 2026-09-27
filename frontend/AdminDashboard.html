@@ -56,6 +56,32 @@
         .reservation-status { display: inline-block; margin-top: 6px; padding: 4px 8px; border-radius: 999px; background: #eef5fb; color: #3178c6; font-size: .75rem; font-weight: 700; text-transform: capitalize; }
         .reservation-management-item a { flex: 0 0 auto; padding: 9px 12px; border-radius: 6px; background: #3178c6; color: #fff; text-decoration: none; font-weight: 600; font-size: .85rem; }
 
+
+        /* AI tools (optimizer + analytics) */
+        .ai-btn { background: #3178c6; color: #fff; border: 1px solid #3178c6; padding: 7px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: .9rem; }
+        .ai-btn.secondary { background: #fff; color: #3178c6; }
+        .ai-select { padding: 7px 8px; border: 1px solid #ccc; border-radius: 6px; font: inherit; font-size: .9rem; }
+        .muted { color: #667085; font-size: .85rem; }
+        .table-scroll { overflow-x: auto; }
+        .ai-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+        .ai-table th { text-align: left; color: #555; font-weight: 600; padding: 10px; border-bottom: 2px solid #e1e8ed; white-space: nowrap; }
+        .ai-table td { padding: 10px; border-bottom: 1px solid #eef3f8; vertical-align: top; }
+        .ai-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .ai-table tr.best td { background: #f3f9f4; }
+        .pill { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: #28a745; color: #fff; font-size: .7rem; font-weight: 700; }
+        .hour-chart { display: flex; align-items: flex-end; gap: 3px; height: 160px; padding: 0 2px 20px; border-bottom: 1px solid #e1e8ed; }
+        .bar-col { position: relative; flex: 1; height: 100%; display: flex; align-items: flex-end; }
+        .bar { width: 100%; min-height: 2px; background: #d6e4f3; border-radius: 3px 3px 0 0; }
+        .bar.peak { background: #3178c6; }
+        .bar.busy { background: #7fa9d9; }
+        .bar-label { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: .7rem; color: #888; }
+        .peak-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
+        .peak-card { padding: 14px; border: 1px solid #e1e8ed; border-left: 5px solid #d6e4f3; border-radius: 8px; background: #fbfdff; }
+        .peak-card.peak { border-left-color: #3178c6; }
+        .peak-card.busy { border-left-color: #7fa9d9; }
+        .peak-tag { text-transform: uppercase; letter-spacing: .5px; font-size: .72rem; font-weight: 700; color: #3178c6; }
+        .peak-time { font-size: 1.25rem; font-weight: 700; color: #1a1a1a; margin: 4px 0; font-variant-numeric: tabular-nums; }
+
         @media (max-width: 800px) {
             .top-nav { flex-wrap: wrap; gap: 12px; padding: 12px 18px; }
             .top-nav .nav-links { order: 3; width: 100%; justify-content: center; gap: 14px; overflow-x: auto; }
@@ -104,6 +130,12 @@
             </div>
             <div class="nav-item" data-tab="live-queue" onclick="switchTab('live-queue', this)">
                 🚶 Live Queue
+            </div>
+            <div class="nav-item" data-tab="optimizer" onclick="switchTab('optimizer', this)">
+                🧩 Optimizer
+            </div>
+            <div class="nav-item" data-tab="analytics" onclick="switchTab('analytics', this)">
+                📈 Peak Hours
             </div>
         </nav>
 
@@ -155,13 +187,45 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="color: #3178c6; margin: 0;">Live Walk-in Queue</h3>
                     <div style="display: flex; gap: 8px;">
-                        <button onclick="smartAllocateTable()" style="background: #3178c6; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">🤖 Allocate Ready Guest</button>
+                        <button onclick="smartAllocateTable()" style="background: #3178c6; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">🤖 Allocate Ready Guests</button>
                         <button onclick="loadLiveQueue(localStorage.getItem('restaurant_id'))" style="background: #fff; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer;">🔄 Refresh</button>
                     </div>
                 </div>
                 <p style="color: #666; margin-bottom: 20px;">Manage customers currently waiting for a table.</p>
                 
                 <div id="live-queue-list"></div>
+            </div>
+        </section>
+
+        <section id="optimizer" class="content-section">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
+                    <h3 style="color: #3178c6; margin: 0;">Table Allocation Optimizer</h3>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="ai-btn" onclick="runOptimizer('live')">Compare on live queue</button>
+                        <button class="ai-btn secondary" onclick="runOptimizer('demo')">Run demo instance</button>
+                    </div>
+                </div>
+                <p style="color: #666; margin-bottom: 16px;">Seats every waiting party at once. Each run is scored the same way: wasted seats, plus 10 points per guest left unseated, plus 0.5 per minute that guest has already waited. Lower is better. The demo instance is one where hill climbing gets stuck.</p>
+                <div id="optimizer-results"></div>
+            </div>
+        </section>
+
+        <section id="analytics" class="content-section">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
+                    <h3 style="color: #3178c6; margin: 0;">Peak Hours</h3>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="peak-source" class="ai-select" onchange="loadPeakHours()">
+                            <option value="all">Reservations + walk-ins</option>
+                            <option value="reservations">Reservations only</option>
+                            <option value="queue">Walk-ins only</option>
+                        </select>
+                        <button class="ai-btn secondary" onclick="loadPeakHours()">Refresh</button>
+                    </div>
+                </div>
+                <p style="color: #666; margin-bottom: 16px;">Groups the last 90 days of bookings and walk-ins by time of day using K-means clustering. The number of groups is picked automatically, and the largest group is your peak.</p>
+                <div id="peak-hours"></div>
             </div>
         </section>
 
@@ -181,6 +245,8 @@
             
             document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
+
+            if (tabId === 'analytics' && !document.querySelector('#peak-hours > *')) loadPeakHours();
 
             document.getElementById('page-title').innerText = element.innerText.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
         }
@@ -451,7 +517,12 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message || 'Auto-allocation failed.');
                 if (data.allocated) {
-                    if (showMessage) alert(`Guest allocated to table ${data.table_no}.`);
+                    if (showMessage) {
+                        const seated = data.assignments || [{ table_no: data.table_no }];
+                        alert(seated.length === 1
+                            ? `Guest allocated to table ${seated[0].table_no}.`
+                            : `Seated ${seated.length} parties in one batch (CSP): tables ${seated.map((a) => a.table_no).join(', ')}.`);
+                    }
                     await loadLiveQueue(restaurantId);
                 } else if (showMessage) {
                     alert(data.message);
@@ -477,6 +548,143 @@
         }, 30000); 
 
         setInterval(() => smartAllocateTable(false), 30000);
+
+        // ── AI tools: allocation optimizer + peak-hour analytics ──────────
+        const API_ROOT = 'http://localhost:5000/api';
+        const adminHeaders = () => ({
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+        });
+        const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+        const SOLVER_LABELS = {
+            baseline: ['Old rule (greedy FIFO)', 'Oldest party takes the smallest table that fits'],
+            csp: ['CSP backtracking', 'MRV + LCV + forward checking + branch & bound (optimal)'],
+            hill_climbing: ['Hill climbing', 'Local moves and swaps, starting from the old rule'],
+            genetic: ['Genetic algorithm', 'Selection, crossover, mutation (seeded)']
+        };
+
+        function solverDetail(key, r) {
+            const s = r.stats || {};
+            if (key === 'csp') return `${s.nodes_explored} nodes explored, ${s.branches_pruned} pruned${s.optimal ? ', proven optimal' : ', node limit hit'}`;
+            if (key === 'hill_climbing') return `${s.steps} improving step(s), then stopped: ${String(s.stopped_because).replace('_', ' ')}`;
+            if (key === 'genetic') {
+                const h = s.best_cost_by_generation || [];
+                const firstBest = h.indexOf(h[h.length - 1]);
+                return `best found by generation ${firstBest} of ${s.generations}`;
+            }
+            return '';
+        }
+
+        async function runOptimizer(mode) {
+            const box = document.getElementById('optimizer-results');
+            box.innerHTML = '<p style="color:#666;">Running solvers…</p>';
+            const restaurantId = localStorage.getItem('restaurant_id');
+            try {
+                const res = await fetch(mode === 'demo' ? `${API_ROOT}/queue/optimize/demo` : `${API_ROOT}/queue/optimize/${restaurantId}`, {
+                    method: 'POST', headers: adminHeaders(), body: JSON.stringify({ algorithm: 'compare' })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Optimizer failed.');
+
+                const results = data.results;
+                if (mode === 'live' && data.parties === 0) {
+                    box.innerHTML = '<p style="color:#666;">No parties are waiting right now, so there is nothing to optimise. Try the demo instance.</p>';
+                    return;
+                }
+                const best = Math.min(...Object.values(results).map((r) => r.cost));
+                const rows = Object.entries(results).map(([key, r]) => {
+                    const [name, how] = SOLVER_LABELS[key];
+                    const seats = r.seated.map((s) => `${escapeHtml(s.party_id)}→${escapeHtml(s.table_id)}`).join(', ') || '—';
+                    const isBest = r.cost === best;
+                    return `<tr class="${isBest ? 'best' : ''}">
+                        <td><strong>${name}</strong><div class="muted">${how}</div></td>
+                        <td class="num">${r.cost}${isBest ? ' <span class="pill">best</span>' : ''}</td>
+                        <td class="num">${r.guests_seated}</td>
+                        <td class="num">${r.wasted_seats}</td>
+                        <td><div>${seats}</div><div class="muted">${solverDetail(key, r)}</div></td>
+                    </tr>`;
+                }).join('');
+
+                const context = mode === 'demo'
+                    ? `<p class="muted" style="margin-bottom:10px;">Parties ${data.instance.parties.map((p) => `${escapeHtml(p.id)}(${p.size})`).join(', ')} · Tables ${data.instance.tables.map((t) => `${escapeHtml(t.id)}(${t.capacity})`).join(', ')}</p>`
+                    : `<p class="muted" style="margin-bottom:10px;">${data.parties} waiting part${data.parties === 1 ? 'y' : 'ies'}, ${data.tables} vacant table${data.tables === 1 ? '' : 's'}. Party and table IDs are queue and table IDs.</p>`;
+                const apply = mode === 'live' && results.csp.seated.length
+                    ? `<button class="ai-btn" style="margin-top:12px;" onclick="applyOptimizer()">Seat guests using the CSP result</button>` : '';
+
+                box.innerHTML = `${context}<div class="table-scroll"><table class="ai-table">
+                    <thead><tr><th>Algorithm</th><th class="num">Cost</th><th class="num">Guests seated</th><th class="num">Wasted seats</th><th>Assignment</th></tr></thead>
+                    <tbody>${rows}</tbody></table></div>${apply}`;
+            } catch (error) {
+                box.innerHTML = `<p style="color:#d9534f;">${escapeHtml(error.message)}</p>`;
+            }
+        }
+
+        async function applyOptimizer() {
+            if (!confirm('Seat these guests and mark their tables as occupied?')) return;
+            const restaurantId = localStorage.getItem('restaurant_id');
+            try {
+                const res = await fetch(`${API_ROOT}/queue/optimize/${restaurantId}`, {
+                    method: 'POST', headers: adminHeaders(), body: JSON.stringify({ algorithm: 'csp', apply: true })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Could not apply allocation.');
+                alert(`Seated ${data.assignments.length} part${data.assignments.length === 1 ? 'y' : 'ies'}: ` +
+                    data.assignments.map((a) => `${a.group_size} guests → table ${a.table_no}`).join(', '));
+                runOptimizer('live');
+                loadLiveQueue(restaurantId);
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        function hhmmToMinutes(t) {
+            const [h, m] = t.split(':').map(Number);
+            return h * 60 + m;
+        }
+
+        async function loadPeakHours() {
+            const box = document.getElementById('peak-hours');
+            const restaurantId = localStorage.getItem('restaurant_id');
+            const source = document.getElementById('peak-source').value;
+            box.innerHTML = '<p style="color:#666;">Clustering…</p>';
+            try {
+                const res = await fetch(`${API_ROOT}/admin/analytics/peak-hours/${restaurantId}?source=${source}`, { headers: adminHeaders() });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Could not load analytics.');
+
+                const max = Math.max(1, ...data.hourly);
+                // Which cluster each hour's midpoint falls inside (for bar colour).
+                const clusterOfHour = (h) => data.clusters.findIndex((c) => {
+                    const start = hhmmToMinutes(c.window_start);
+                    const end = hhmmToMinutes(c.window_end);
+                    const mid = h * 60 + 30;
+                    return start <= end ? mid >= start && mid <= end : mid >= start || mid <= end;
+                });
+                const bars = data.hourly.map((n, h) => {
+                    const c = clusterOfHour(h);
+                    const cls = c === -1 ? '' : data.clusters[c].label;
+                    return `<div class="bar-col" title="${String(h).padStart(2, '0')}:00 · ${n} booking${n === 1 ? '' : 's'}">
+                        <div class="bar ${cls}" style="height:${Math.round((n / max) * 100)}%"></div>
+                        <span class="bar-label">${h % 3 === 0 ? String(h).padStart(2, '0') : ''}</span>
+                    </div>`;
+                }).join('');
+
+                const cards = data.clusters.map((c) => `
+                    <div class="peak-card ${c.label}">
+                        <div class="peak-tag">${c.label}</div>
+                        <div class="peak-time">${c.window_start}–${c.window_end}</div>
+                        <div class="muted">centred on ${c.center} · ${c.count} bookings (${c.share}%)</div>
+                    </div>`).join('');
+
+                box.innerHTML = `
+                    <p class="muted" style="margin-bottom:12px;">${data.samples} bookings and arrivals in the last ${data.days} days${data.k ? ` · ${data.k} time windows found (silhouette score ${data.silhouette}; closer to 1 means more clearly separated)` : ''}</p>
+                    <div class="hour-chart">${bars}</div>
+                    ${data.clusters.length ? `<div class="peak-cards">${cards}</div>` : `<p style="color:#666;margin-top:12px;">${escapeHtml(data.message || 'No clusters found.')}</p>`}`;
+            } catch (error) {
+                box.innerHTML = `<p style="color:#d9534f;">${escapeHtml(error.message)}</p>`;
+            }
+        }
     </script>
     <script src="js/navigation.js"></script>
 </body>
