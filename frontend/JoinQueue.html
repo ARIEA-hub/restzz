@@ -94,6 +94,21 @@
             margin-right: 8px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Tic-tac-toe vs. AI (minimax / alpha-beta) — shown while waiting */
+        #ttt-container { margin-top: 28px; padding-top: 22px; border-top: 1px solid #e1e8ed; text-align: left; }
+        .ttt-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; color: #333; }
+        .ttt-algo { font-size: 0.85rem; color: #555; }
+        .ttt-algo select { margin-left: 4px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 6px; font: inherit; }
+        .ttt-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(100%, 240px); margin: 0 auto; }
+        .ttt-cell { aspect-ratio: 1; border: 2px solid #dfeaf5; border-radius: 10px; background: #f8fbff; color: #3178c6; font-size: 2rem; font-weight: 700; cursor: pointer; }
+        .ttt-cell:disabled { cursor: default; color: #1a1a1a; }
+        .ttt-cell:not(:disabled):hover { border-color: #3178c6; }
+        .ttt-cell.ttt-win { background: #eef5fb; border-color: #3178c6; }
+        .ttt-status { margin-top: 12px; text-align: center; font-weight: 600; color: #333; }
+        .ttt-stats { margin-top: 6px; min-height: 1.2em; text-align: center; font-size: 0.8rem; color: #777; }
+        .ttt-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 0.85rem; color: #555; }
+        .ttt-foot button { padding: 6px 12px; border: 1px solid #3178c6; border-radius: 6px; background: #fff; color: #3178c6; font: inherit; font-weight: 600; cursor: pointer; }
     </style>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -152,9 +167,11 @@
             <div class="wait-time"><span class="loader"></span> Estimated Wait: <span id="display-ewt">--</span> min</div>
             <div class="people-ahead" id="display-ahead">-- parties ahead of you</div>
             <button id="leave-queue-btn" class="leave-btn" type="button">Leave Queue</button>
+            <div id="ttt-container"></div>
         </div>
     </div>
 
+    <script src="js/tictactoe.js"></script>
     <script>
       
         const urlParams = new URLSearchParams(window.location.search);
@@ -228,6 +245,9 @@
             document.getElementById("join-section").style.display = "none";
             document.getElementById("tracker-section").style.display = "block";
             
+            if (!document.querySelector('#ttt-container .ttt')) {
+                TicTacToe.mount(document.getElementById('ttt-container'));
+            }
             fetchQueueStatus(queueId);
             pollingInterval = setInterval(() => fetchQueueStatus(queueId), 5000);
         }
@@ -279,6 +299,9 @@
                 
                     document.getElementById("display-position").textContent = data.position;
                     document.getElementById("display-ewt").textContent = data.estimated_wait_time;
+                    document.getElementById("display-ewt").title = data.estimate_source === 'decision_tree'
+                        ? 'Predicted by a decision-tree model trained on past waits'
+                        : 'Rule-of-thumb estimate (5 min per party ahead)';
                     document.getElementById("display-ahead").textContent = `${data.people_ahead} parties ahead of you`;
 
                     const statusBadge = document.getElementById("display-status");
