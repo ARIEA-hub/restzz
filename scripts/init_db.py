@@ -87,11 +87,15 @@ CREATE TABLE IF NOT EXISTS queue (
     group_size      INTEGER         NOT NULL,
     status          VARCHAR(20)     DEFAULT 'waiting'
                     CHECK (status IN ('waiting','called','seated','left')),
-    joined_at       TIMESTAMPTZ     DEFAULT NOW()
+    joined_at       TIMESTAMPTZ     DEFAULT NOW(),
+    queue_length_at_join  INTEGER,                    -- ML feature snapshot
+    tables_vacant_at_join INTEGER,                    -- ML feature snapshot
+    seated_at       TIMESTAMPTZ                       -- ML label: seated_at - joined_at
 );
 
 -- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_queue_restaurant_status   ON queue(restaurant_id, status);
+CREATE INDEX IF NOT EXISTS idx_queue_restaurant_joined   ON queue(restaurant_id, joined_at);
 CREATE INDEX IF NOT EXISTS idx_reservation_customer      ON reservation(customer_id);
 CREATE INDEX IF NOT EXISTS idx_reservation_restaurant    ON reservation(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_customer_email            ON customer(email);
