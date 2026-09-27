@@ -9,14 +9,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from api.routes import restaurants, prediction, reservations, queue
+from api.routes import prediction
+
+# The restaurants router needs DATABASE_URL at import time (api/database.py
+# raises without it). Prediction must not depend on the database, so the
+# ML service still starts — and still predicts — when the DB is unavailable.
+try:
+    from api.routes import restaurants
+except EnvironmentError as exc:
+    restaurants = None
+    print(f"[warn] Restaurant routes disabled: {exc}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    print("✅ Q-Sense FastAPI started (ML prediction layer)")
-    print(f"   DB connected: {'Yes' if os.environ.get('DATABASE_URL') else 'NO — DATABASE_URL not set!'}")
+    print("[ok] Q-Sense FastAPI started (ML prediction layer)")
+    print(f"   DB connected: {'Yes' if os.environ.get('DATABASE_URL') else 'NO - DATABASE_URL not set!'}")
     yield
     print("FastAPI shutting down.")
 
@@ -41,10 +50,11 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(restaurants.router,  prefix="/api",  tags=["Restaurants"])
+# (reservations/queue are served by the Express backend, not here — the
+# modules this file used to import for them never existed.)
 app.include_router(prediction.router,   prefix="/api",  tags=["Prediction"])
-app.include_router(reservations.router, prefix="/api",  tags=["Reservations"])
-app.include_router(queue.router,        prefix="/api",  tags=["Queue"])
+if restaurants is not None:
+    app.include_router(restaurants.router, prefix="/api", tags=["Restaurants"])
 
 
 @app.get("/")

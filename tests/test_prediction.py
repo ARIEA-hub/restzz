@@ -32,11 +32,31 @@ class TestPredictWaitTime:
         assert result >= 0, "Wait time should not be negative"
 
     def test_larger_queue_means_more_wait(self):
-        """More people queuing should predict a longer wait."""
+        """With no free tables, more people queuing should predict a longer wait.
+
+        (Not true in general: under skip-ahead seating, a long queue WITH free
+        tables means the waiting parties don't fit them, so a small party is
+        seated at once — the tree correctly learns that.)"""
         from src.models.predict_model import predict_wait_time
-        low_wait  = predict_wait_time(party_size=2, queue_length=1,  tables_available=10)
-        high_wait = predict_wait_time(party_size=2, queue_length=20, tables_available=2)
+        low_wait  = predict_wait_time(party_size=2, queue_length=1,  tables_available=0, hour_of_day=20, day_of_week=5)
+        high_wait = predict_wait_time(party_size=2, queue_length=12, tables_available=0, hour_of_day=20, day_of_week=5)
         assert high_wait > low_wait, "Higher queue should result in longer predicted wait"
+
+    def test_bigger_party_waits_at_least_as_long_when_busy(self):
+        """Big parties compete for few big tables — the tree should learn that."""
+        from src.models.predict_model import predict_wait_time
+        small = predict_wait_time(party_size=2, queue_length=6, tables_available=1, hour_of_day=20, day_of_week=5)
+        large = predict_wait_time(party_size=8, queue_length=6, tables_available=1, hour_of_day=20, day_of_week=5)
+        assert large >= small
+
+    def test_never_negative(self):
+        from src.models.predict_model import predict_wait_time
+        for q in range(0, 15, 3):
+            assert predict_wait_time(party_size=1, queue_length=q, tables_available=12) >= 0
+
+    def test_model_is_a_decision_tree(self):
+        from src.models.predict_model import model_info
+        assert model_info()["model"] == "DecisionTreeRegressor"
 
     def test_zero_queue_returns_result(self):
         from src.models.predict_model import predict_wait_time
@@ -81,6 +101,17 @@ class TestPredictEndpoint:
         response = client.get("/api/predict?party_size=4")
         assert response.status_code == 422    # FastAPI validation error
 
+    def test_predict_rejects_bad_hour(self, client):
+        response = client.get("/api/predict?party_size=2&queue_length=1&tables_available=1&hour_of_day=25")
+        assert response.status_code == 400
+
+    def test_model_info(self, client):
+        response = client.get("/api/model-info")
+        assert response.status_code in (200, 503)
+        if response.status_code == 200:
+            assert response.json()["data_source"] in ("real", "synthetic")
+
+    @pytest.mark.skipif(not os.environ.get("DATABASE_URL"), reason="needs DATABASE_URL")
     def test_restaurants_endpoint(self, client):
         response = client.get("/api/restaurants")
         assert response.status_code == 200
