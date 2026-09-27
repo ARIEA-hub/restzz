@@ -15,6 +15,8 @@ const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 // locally-generated OTP) so that POST /api/verify-otp in otp.js can find
 // and validate the code generated below.
 const otpStore    = require('../utils/otpStore');
+const { requireAdmin } = require('../utils/auth');
+const { findPeakHours } = require('../utils/kmeans');
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -446,6 +448,66 @@ router.get('/customer-summary/:customerId', async (req, res) => {
     } catch (error) {
         console.error('Error building customer summary:', error);
         res.status(500).json({ message: 'Failed to build customer summary.' });
+    }
+});
+
+
+// ── GET /api/admin/analytics/peak-hours/:restaurantId ────────────────
+// Unsupervised peak-hour discovery (api/utils/kmeans.js): K-means over the
+// time of day of every booking/arrival. Admin-only.
+//
+// Query params: source = "all" (default) | "reservations" | "queue";
+// k (optional — chosen by silhouette score if omitted); days (lookback,
+// default 90).
+//
+// Times are converted to the restaurant's local time (RESTAURANT_TZ,
+// default Asia/Kolkata) — timestamptz values come back from Supabase in
+// UTC, which would put the dinner rush at 14:30.
+router.get('/analytics/peak-hours/:restaurantId', requireAdmin, async (req, res) => {
+    const { restaurantId } = req.params;
+    const source = ['reservations', 'queue'].includes(req.query.source) ? req.query.source : 'all';
+    const k = parseInt(req.query.k, 10) || undefined;
+    const days = Math.min(parseInt(req.query.days, 10) || 90, 730);
+    const tz = process.env.RESTAURANT_TZ || 'Asia/Kolkata';
+
+    try {
+        const minutes = [];
+        if (source !== 'queue') {
+            // reserve_time is a plain TIME — already local, no conversion.
+            const [rows] = await db.query(`
+                SELECT EXTRACT(HOUR FROM reserve_time) * 60 + EXTRACT(MINUTE FROM reserve_time) AS m
+                FROM reservation
+                WHERE restaurant_id = $1
+                  AND status <> 'cancelled'
+                  AND reserve_date >= CURRENT_DATE - $2::int
+            `, [restaurantId, days]);
+            rows.forEach((r) => minutes.push(Number(r.m)));
+        }
+        if (source !== 'reservations') {
+            const [rows] = await db.query(`
+                SELECT EXTRACT(HOUR FROM joined_at AT TIME ZONE $3) * 60
+                     + EXTRACT(MINUTE FROM joined_at AT TIME ZONE $3) AS m
+                FROM queue
+                WHERE restaurant_id = $1
+                  AND joined_at >= NOW() - ($2::int * INTERVAL '1 day')
+            `, [restaurantId, days, tz]);
+            rows.forEach((r) => minutes.push(Number(r.m)));
+        }
+
+        const hourly = Array(24).fill(0);
+        minutes.forEach((m) => { hourly[Math.floor(m / 60) % 24]++; });
+
+        if (minutes.length < 10) {
+            return res.json({
+                source, days, samples: minutes.length, hourly, k: 0, clusters: [],
+                message: 'Not enough bookings yet to find meaningful peak hours (need at least 10).'
+            });
+        }
+
+        res.json({ source, days, samples: minutes.length, hourly, ...findPeakHours(minutes, { k }) });
+    } catch (error) {
+        console.error('Peak-hour analytics error:', error);
+        res.status(500).json({ message: 'Failed to compute peak hours.' });
     }
 });
 
