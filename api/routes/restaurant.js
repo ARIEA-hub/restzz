@@ -101,7 +101,7 @@ router.get('/recommended', async (req, res) => {
                 const response = await ai.models.generateContent({
                     model: geminiModel,
                     contents: prompt,
-                    config: { maxOutputTokens: 100, temperature: 0.3 }
+                    config: { maxOutputTokens: 100, temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } } // one sentence: no thinking, or it eats the token budget
                 });
                 explanation = (response.text || '').trim() || null;
             } catch (explainError) {

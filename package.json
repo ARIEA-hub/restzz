@@ -9,7 +9,8 @@
     "test": "node --test \"tests/js/**/*.test.js\"",
     "ml:simulate": "python scripts/simulate_wait_data.py",
     "ml:train": "python src/models/train_model.py",
-    "ml:serve": "uvicorn api.main:app --port 8000"
+    "ml:serve": "uvicorn api.main:app --port 8000",
+    "check:gemini": "node scripts/check_gemini_actions.js"
   },
   "keywords": [],
   "author": "",

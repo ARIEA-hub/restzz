@@ -1,7 +1,8 @@
 // api/utils/expertSystem.js
 //
-// Rule-based "why this restaurant?" recommender — a small but real expert
-// system. Architecture (see docs/expert-system.md for the write-up):
+// "Recommended for you" on the Locations page: which restaurant suits this
+// party right now, and why. It's a small rule-based expert system
+// (write-up: docs/expert-system.md):
 //
 //   Knowledge base  = RULES (Horn clauses, universally quantified over a
 //                     restaurant R) + FACTS asserted from live data.
@@ -233,10 +234,39 @@ function recommend(restaurants, partySize, thresholds = THRESHOLDS) {
                 why_not_strong: whyNot && whyNot.attempts
                     ? whyNot.attempts.map((a) => ({ rule: a.rule, missing: a.missing }))
                     : null,
+                highlights: highlights(r, facts, partySize),
                 explanation: explain(r.name, base, trail, conclusion)
             };
         })
         .sort((a, b) => b.rank - a.rank || (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity));
+}
+
+/**
+ * The explanation facility in customer language: short good/bad points
+ * built from what was actually derived (not from the raw numbers), so the
+ * panel on the Locations page says the same thing the rules concluded.
+ */
+function highlights(r, facts, partySize) {
+    const out = [];
+    const good = (text) => out.push({ good: true, text });
+    const bad = (text) => out.push({ good: false, text });
+    const km = r.distance_km == null ? null : `${Number(r.distance_km).toFixed(1)} km`;
+    const waiting = Number(r.waiting_count) || 0;
+
+    if (facts.has('party_mismatch')) bad(`No table here seats ${partySize}`);
+    else if (facts.has('can_seat_now')) good(`Table for ${partySize} free now`);
+    else bad(`No free table for ${partySize} right now`);
+
+    if (facts.has('long_wait')) bad(`Long queue (${waiting} parties)`);
+    else if (facts.has('short_wait')) good(waiting === 0 ? 'No queue' : `Short queue (${waiting} ${waiting === 1 ? 'party' : 'parties'})`);
+    else if (waiting > 0) out.push({ good: null, text: `${waiting} ${waiting === 1 ? 'party' : 'parties'} waiting` });
+
+    if (km) {
+        if (facts.has('nearby')) good(`${km}, walkable`);
+        else if (facts.has('far')) bad(`${km} away`);
+        else out.push({ good: null, text: `${km} away` });
+    }
+    return out;
 }
 
 function explain(name, base, trail, conclusion) {
@@ -256,5 +286,6 @@ module.exports = {
     toClauses,
     resolutionProve,
     recommend,
+    highlights,
     explain
 };

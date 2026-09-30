@@ -4,6 +4,8 @@ const db = require('../database.js');
 const { GoogleGenAI } = require('@google/genai');
 const jwt = require('jsonwebtoken');
 const { rankByConvenience } = require('../utils/scoring');
+const { predictWait } = require('../utils/waitPredictor');
+const { createReservation, joinQueue } = require('../utils/bookings');
 
 const ai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
@@ -86,7 +88,7 @@ function getFaqResponse(message, restaurantRows, queueRows) {
     }
 
     if (has('cancel', 'reservation') || has('cancel', 'booking')) {
-        return 'Customer reservation cancellation is not currently available in the app. Please contact the restaurant directly to request a cancellation.';
+        return 'Open your Dashboard, find the booking under upcoming reservations, and choose Cancel reservation. If a table was already set aside, it is released for other guests.';
     }
 
     if (question === 'which restaurants are open right now') {
@@ -183,26 +185,31 @@ router.post('/message', async (req, res, next) => {
         if (userId && authenticatedUserId && String(userId) === String(authenticatedUserId)) {
             [queueRows, reservationRows] = await Promise.all([
                 db.query(
+                    // Position counts everyone waiting ahead at that restaurant
+                    // (a window over this customer's own rows would always say 1).
                     `SELECT q.queue_id, q.restaurant_id, q.group_size, q.status,
                             q.joined_at, r.name AS restaurant_name,
-                            CASE WHEN q.status IN ('waiting', 'called') THEN
-                                ROW_NUMBER() OVER (
-                                    PARTITION BY q.restaurant_id
-                                    ORDER BY q.joined_at ASC
-                                )
-                            END AS position,
-                            CASE WHEN q.status IN ('waiting', 'called') THEN
-                                ROW_NUMBER() OVER (
-                                    PARTITION BY q.restaurant_id
-                                    ORDER BY q.joined_at ASC
-                                ) * 5
-                            END AS estimated_wait_minutes
+                            (SELECT COUNT(*) FROM queue a
+                              WHERE a.restaurant_id = q.restaurant_id
+                                AND a.status = 'waiting'
+                                AND a.joined_at < q.joined_at)::int AS people_ahead,
+                            (SELECT COUNT(*) FROM restaurant_tables t
+                              WHERE t.restaurant_id = q.restaurant_id
+                                AND t.status = 'vacant')::int AS vacant_tables
                      FROM queue q
                      JOIN restaurant r ON r.restaurant_id = q.restaurant_id
                      WHERE q.customer_id = $1 AND q.status IN ('waiting', 'called')
                      ORDER BY q.joined_at ASC`,
                     [userId]
-                ).then(([rows]) => rows),
+                ).then(([rows]) => Promise.all(rows.map(async (row) => {
+                    // Same wait prediction the queue page shows.
+                    const estimate = await predictWait({
+                        partySize: row.group_size,
+                        peopleAhead: row.people_ahead,
+                        tablesAvailable: row.vacant_tables
+                    });
+                    return { ...row, position: row.people_ahead + 1, estimated_wait_minutes: estimate.minutes };
+                }))),
                 db.query(
                     `SELECT res.reserve_id, res.restaurant_id, res.reserve_date,
                             res.reserve_time, res.group_size, res.status,
@@ -247,6 +254,9 @@ router.post('/message', async (req, res, next) => {
             config: {
                 systemInstruction,
                 maxOutputTokens: 500,
+                // Thinking tokens count against maxOutputTokens; for short Q&A
+                // they only risk cutting the answer off.
+                thinkingConfig: { thinkingBudget: 0 },
                 temperature: 0.2
             }
         });
@@ -331,19 +341,48 @@ const joinQueueDeclaration = {
     }
 };
 
+// Today's date and time on the restaurant's clock, so Gemini can turn
+// "tonight" / "tomorrow at 8" into a real date instead of guessing one.
+function restaurantNow() {
+    const tz = process.env.RESTAURANT_TZ || 'Asia/Kolkata';
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', weekday: 'long', hour12: false
+    }).formatToParts(new Date()).map((p) => [p.type, p.value]));
+    return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}`, weekday: parts.weekday, tz };
+}
+
+/** Gemini request config for booking/queue actions (shared with the live test). */
+function buildActionConfig(openRestaurantNames, now = restaurantNow()) {
+    return {
+        systemInstruction: `You help customers book tables or join waitlists at Q-Sense restaurants.
+            Today is ${now.weekday}, ${now.date}, and the time is ${now.time} (${now.tz}).
+            Resolve relative dates and times ("tonight", "tomorrow at 8") from that, and output
+            reserve_date as YYYY-MM-DD and reserve_time as 24-hour HH:MM.
+            Open restaurants right now: ${openRestaurantNames.join(', ') || 'none currently open'}.
+            If the user's message clearly requests booking a table or joining a queue, call the
+            matching function. If required details are missing (date, time, or party size), do NOT
+            call a function — ask a brief clarifying question in plain text instead.
+            If the message isn't a booking/queue request, respond normally in plain text.`,
+        tools: [{ functionDeclarations: [bookTableDeclaration, joinQueueDeclaration] }],
+        // Some thinking helps resolve dates; the larger limit keeps it from
+        // starving the function call (thinking counts against this limit).
+        maxOutputTokens: 1024,
+        thinkingConfig: { thinkingLevel: 'low' },
+        temperature: 0.1
+    };
+}
+
 // ── POST /api/chatbots/action ────────────────────────────────────────
 // Separate from /message (which stays pure Q&A) so this higher-stakes,
 // harder-to-fully-verify-offline path can't destabilize the working
 // chatbot. Requires login — booking/joining a queue always needs a
 // real customer_id.
 //
-// NOTE: function-calling response shapes can vary slightly between
-// @google/genai SDK versions. extractFunctionCall() above checks both
-// the convenience `.functionCalls` array and the raw candidates/parts
-// structure defensively, but this endpoint hasn't been exercised
-// against a live API key in this environment (no network access here)
-// — test it for real before relying on it, same caution as any new
-// third-party API integration.
+// Function-calling response shapes can vary slightly between
+// @google/genai SDK versions; extractFunctionCall() above checks both the
+// convenience `.functionCalls` array and the raw candidates/parts.
+// Tested live with scripts/check_gemini_actions.js.
 router.post('/action', async (req, res) => {
     try {
         const { message } = req.body;
@@ -376,19 +415,7 @@ router.post('/action', async (req, res) => {
         const response = await ai.models.generateContent({
             model,
             contents: message,
-            config: {
-                systemInstruction: `You help customers book tables or join waitlists at Q-Sense restaurants.
-                    Today's date context matters for resolving "tonight"/"tomorrow" — assume the user means
-                    the near future, not a past date.
-                    Open restaurants right now: ${restaurantRows.map((r) => r.name).join(', ') || 'none currently open'}.
-                    If the user's message clearly requests booking a table or joining a queue, call the
-                    matching function. If required details are missing (date, time, or party size), do NOT
-                    call a function — ask a brief clarifying question in plain text instead.
-                    If the message isn't a booking/queue request, respond normally in plain text.`,
-                tools: [{ functionDeclarations: [bookTableDeclaration, joinQueueDeclaration] }],
-                maxOutputTokens: 300,
-                temperature: 0.1
-            }
+            config: buildActionConfig(restaurantRows.map((r) => r.name))
         });
 
         const functionCall = extractFunctionCall(response);
@@ -416,14 +443,18 @@ router.post('/action', async (req, res) => {
                 return res.json({ reply: `To book at ${restaurant.name}, I still need the ${missing}.`, action: null });
             }
 
-            await db.query(
-                `INSERT INTO reservation (customer_id, restaurant_id, group_size, reserve_date, reserve_time)
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [customerId, restaurant.restaurant_id, group_size, reserve_date, reserve_time]
-            );
+            // Same checks as the booking page (party fits a table, time not past).
+            const booking = await createReservation({
+                customerId,
+                restaurantId: restaurant.restaurant_id,
+                groupSize: group_size,
+                date: reserve_date,
+                time: reserve_time
+            });
+            if (booking.error) return res.json({ reply: booking.error, action: null });
 
             return res.json({
-                reply: `Booked! A table for ${group_size} at ${restaurant.name} on ${reserve_date} at ${reserve_time}.`,
+                reply: `Booked: a table for ${group_size} at ${restaurant.name} on ${reserve_date} at ${reserve_time}.`,
                 action: { type: 'book_table', restaurant_id: restaurant.restaurant_id }
             });
         }
@@ -434,22 +465,14 @@ router.post('/action', async (req, res) => {
                 return res.json({ reply: `How many people are in your party for ${restaurant.name}?`, action: null });
             }
 
-            const [existing] = await db.query(
-                `SELECT queue_id FROM queue WHERE customer_id = $1 AND restaurant_id = $2 AND status IN ('waiting', 'called')`,
-                [customerId, restaurant.restaurant_id]
-            );
-            if (existing.length > 0) {
-                return res.json({ reply: `You're already in the queue at ${restaurant.name}.`, action: null });
-            }
-
-            const [rows] = await db.query(
-                `INSERT INTO queue (restaurant_id, customer_id, group_size) VALUES ($1, $2, $3) RETURNING queue_id`,
-                [restaurant.restaurant_id, customerId, group_size]
-            );
+            // Same path as the waitlist page, so the wait model's join-time
+            // snapshot is recorded here too.
+            const joined = await joinQueue({ customerId, restaurantId: restaurant.restaurant_id, groupSize: group_size });
+            if (joined.error) return res.json({ reply: joined.error, action: null });
 
             return res.json({
-                reply: `You're in! Joined the queue at ${restaurant.name} for ${group_size}.`,
-                action: { type: 'join_queue', restaurant_id: restaurant.restaurant_id, queue_id: rows[0].queue_id }
+                reply: `You're in the queue at ${restaurant.name} for ${group_size}.`,
+                action: { type: 'join_queue', restaurant_id: restaurant.restaurant_id, queue_id: joined.queue_id }
             });
         }
 
@@ -497,7 +520,14 @@ router.post('/search', async (req, res) => {
         const response = await ai.models.generateContent({
             model,
             contents: parsePrompt,
-            config: { responseMimeType: 'application/json', maxOutputTokens: 150, temperature: 0 }
+            config: {
+                responseMimeType: 'application/json',
+                maxOutputTokens: 150,
+                temperature: 0,
+                // Without this the model spent 142 of 150 tokens thinking and
+                // returned truncated JSON, so every search came back unfiltered.
+                thinkingConfig: { thinkingBudget: 0 }
+            }
         });
 
         const rawText = extractReplyText(response);
@@ -521,25 +551,36 @@ router.post('/search', async (req, res) => {
             conditions.push(`(r.name ILIKE $${params.length} OR r.location ILIKE $${params.length})`);
         }
 
+        // Subqueries rather than two LEFT JOINs: joining tables AND queue
+        // multiplies the rows, so each count was inflated by the other.
+        const partySize = Number(party_size) || 0;
+        params.push(partySize);
         const [rows] = await db.query(`
             SELECT r.restaurant_id, r.name, r.location, r.latitude, r.longitude,
-                   COUNT(t.table_id) FILTER (WHERE t.status = 'vacant') AS vacant_tables,
-                   COUNT(q.queue_id) FILTER (WHERE q.status = 'waiting') AS waiting_count
+                   (SELECT COUNT(*) FROM restaurant_tables t
+                     WHERE t.restaurant_id = r.restaurant_id AND t.status = 'vacant')::int AS vacant_tables,
+                   (SELECT COUNT(*) FROM restaurant_tables t
+                     WHERE t.restaurant_id = r.restaurant_id AND t.status = 'vacant'
+                       AND t.capacity >= $${params.length})::int AS fitting_tables,
+                   (SELECT COUNT(*) FROM queue q
+                     WHERE q.restaurant_id = r.restaurant_id AND q.status = 'waiting')::int AS waiting_count
             FROM restaurant r
-            LEFT JOIN restaurant_tables t ON t.restaurant_id = r.restaurant_id
-            LEFT JOIN queue q ON q.restaurant_id = r.restaurant_id
             WHERE ${conditions.join(' AND ')}
-            GROUP BY r.restaurant_id
             ORDER BY r.name ASC
         `, params);
 
-        let results = rows.map((r) => ({ ...r, estimated_wait_min: (r.waiting_count || 0) * 5 }));
+        let results = await Promise.all(rows.map(async (r) => {
+            const estimate = await predictWait({
+                partySize: partySize || 2,
+                peopleAhead: r.waiting_count,
+                tablesAvailable: r.vacant_tables
+            });
+            return { ...r, estimated_wait_min: estimate.minutes };
+        }));
 
-        if (party_size) {
-            // We don't track free tables by exact capacity size per
-            // party here, only "has at least one vacant table" — a
-            // real capacity-aware match is a reasonable future add-on.
-            results = results.filter((r) => r.vacant_tables > 0);
+        if (partySize) {
+            // Only places with a free table big enough for this party.
+            results = results.filter((r) => r.fitting_tables > 0);
         }
         if (max_wait_minutes != null) {
             results = results.filter((r) => r.estimated_wait_min <= max_wait_minutes);
@@ -560,3 +601,7 @@ router.post('/search', async (req, res) => {
 module.exports = router;
 module.exports.isTopicRelevant = isTopicRelevant;
 module.exports.supportedFaqQuestions = supportedFaqQuestions;
+module.exports.buildActionConfig = buildActionConfig;
+module.exports.extractFunctionCall = extractFunctionCall;
+module.exports.extractReplyText = extractReplyText;
+module.exports.restaurantNow = restaurantNow;
