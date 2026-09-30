@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Q-Sense | My Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
      
         .dashboard-container {
@@ -183,7 +183,7 @@
         </section>
     </main>
 
-    <div id="qsense-chatbot" style="position: fixed; right: 22px; bottom: 22px; z-index: 9999; font-family: 'Inter', sans-serif;">
+    <div id="qsense-chatbot" style="position: fixed; right: 22px; bottom: 22px; z-index: 9999; font-family: var(--font-sans);">
         <button id="chatbot-toggle" type="button" style="width: 64px; height: 64px; border: none; border-radius: 50%; background: linear-gradient(135deg, #3178c6, #245ea3); color: white; font-size: 28px; box-shadow: 0 12px 30px rgba(49,120,198,0.35); cursor: pointer;">💬</button>
         <div id="chatbot-panel" style="display: none; width: 340px; max-width: calc(100vw - 24px); background: white; border-radius: 18px; box-shadow: 0 20px 40px rgba(0,0,0,0.14); border: 1px solid #e7edf3; overflow: hidden; margin-bottom: 12px;">
             <div style="padding: 14px 16px; background: #3178c6; color: white; font-weight: 700; display: flex; align-items: center; justify-content: space-between;">
@@ -204,6 +204,23 @@
         <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
     </footer>
 
+   <script src="js/api.js"></script>
+    <script>
+        async function cancelReservation(reserveId, button) {
+            if (!confirm('Cancel this reservation?')) return;
+            button.disabled = true;
+            try {
+                await customerFetch(`/reservations/${reserveId}`, { method: 'DELETE' });
+                button.closest('.reservation-item').remove();
+                toast('Reservation cancelled.', 'success');
+                const list = document.getElementById('reservations-list');
+                if (!list.children.length) list.innerHTML = '<div class="empty-state">You have no upcoming reservations.</div>';
+            } catch (error) {
+                button.disabled = false;
+                toast(error.message, 'error');
+            }
+        }
+    </script>
    <script>
 const profileToggle = document.getElementById('profileToggle');
         const profileDropdown = document.getElementById('profileDropdown');
@@ -252,7 +269,7 @@ const profileToggle = document.getElementById('profileToggle');
    
         try {
          
-            const userRes = await fetch(`http://localhost:5000/api/users/${customerId}`);
+            const userRes = await fetch(`http://localhost:5000/api/users/${customerId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` } });
             
           
             if (!userRes.ok) {
@@ -270,13 +287,11 @@ const profileToggle = document.getElementById('profileToggle');
 
             
             const resList = document.getElementById("reservations-list");
-            const revRes = await fetch(`http://localhost:5000/api/reservations/user/${customerId}`);
+            const revRes = await fetch(`http://localhost:5000/api/reservations/user/${customerId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` } });
             
             if(revRes.ok) {
                 const reservations = await revRes.json();
  
-                console.log("My Reservations Data:", reservations);
-
                 resList.innerHTML = ""; 
 
                 if (reservations.length === 0) {
@@ -286,9 +301,10 @@ const profileToggle = document.getElementById('profileToggle');
                         const item = document.createElement("div");
                         item.className = "reservation-item";
                         item.innerHTML = `
-                            <h3 style="margin-bottom: 5px;">${res.name}</h3>
-                            <p style="color: #555;"><strong>Date:</strong> ${res.date} &nbsp;|&nbsp; <strong>Time:</strong> ${res.time}</p>
-                            <p style="color: #555; margin-top: 5px;"><strong>Party Size:</strong> ${res.party_size} guests</p>
+                            <h3 style="margin-bottom: 5px;">${escapeHtml(res.name)}</h3>
+                            <p style="color: #555;"><strong>Date:</strong> ${escapeHtml(res.date)} &nbsp;|&nbsp; <strong>Time:</strong> ${escapeHtml(res.time)}</p>
+                            <p style="color: #555; margin-top: 5px;"><strong>Party size:</strong> ${res.party_size} guests</p>
+                            <button type="button" class="btn btn-ghost" style="margin-top: 10px;" onclick="cancelReservation(${res.reservation_id}, this)">Cancel reservation</button>
                         `;
                         resList.appendChild(item);
                     });

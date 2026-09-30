@@ -6,7 +6,7 @@
     <title>Q-Sense | Verify Your Account</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
         .otp-input {
@@ -107,6 +107,7 @@
         <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
     </footer>
 
+    <script src="js/api.js"></script>
     <script>
     document.addEventListener("DOMContentLoaded", () => {
 
@@ -115,8 +116,8 @@
 
         // Guard: if no temp_email/role, user got here incorrectly
         if (!email || !role) {
-            alert("Session expired or invalid access. Please register again.");
-            window.location.href = "index.html";
+            flash("That verification link has expired. Log in or sign up again.", "error");
+            window.location.href = "CustomerLogin.html";
             return;
         }
 
@@ -130,7 +131,7 @@
             const verifyBtn = document.getElementById("verifyBtn");
 
             if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
-                alert("Please enter a valid 6-digit code.");
+                toast("Enter the 6-digit code from your email.", "error");
                 return;
             }
 
@@ -151,7 +152,7 @@
                     localStorage.removeItem("temp_role");
                     localStorage.removeItem("temp_customer_id");
 
-                    alert("✅ Account verified successfully! You can now log in.");
+                    flash("Account verified. You can log in now.", "success");
 
                     // FLOW D: Go to login — NOT dashboard
                     // User must log in properly to receive their JWT
@@ -160,14 +161,14 @@
                         : "AdminLogin.html");
 
                 } else {
-                    alert(data.message || "Verification failed. Please check your code.");
+                    toast(data.message || "That code didn't work. Check it and try again.", "error");
                     verifyBtn.textContent = "Verify & Activate Account";
                     verifyBtn.disabled    = false;
                 }
 
             } catch (err) {
                 console.error("OTP verify error:", err);
-                alert("A network error occurred.");
+                toast(NETWORK_ERROR, "error");
                 verifyBtn.textContent = "Verify & Activate Account";
                 verifyBtn.disabled    = false;
             }

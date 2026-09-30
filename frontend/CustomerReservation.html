@@ -6,7 +6,7 @@
     <title>Q-Sense | Book a Table</title>
          <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         .navbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 32px; background: #fff; border-bottom: 1px solid #e4edf3; }
         .logo { display: flex; align-items: center; gap: 10px; color: #3178c6; font-weight: 800; }
@@ -128,7 +128,7 @@
         </div>
     </main>
 
-    <div id="qsense-chatbot" style="position: fixed; right: 22px; bottom: 22px; z-index: 9999; font-family: 'Inter', sans-serif;">
+    <div id="qsense-chatbot" style="position: fixed; right: 22px; bottom: 22px; z-index: 9999; font-family: var(--font-sans);">
         <button id="chatbot-toggle" type="button" style="width: 64px; height: 64px; border: none; border-radius: 50%; background: linear-gradient(135deg, #3178c6, #245ea3); color: white; font-size: 28px; box-shadow: 0 12px 30px rgba(49,120,198,0.35); cursor: pointer;">💬</button>
         <div id="chatbot-panel" style="display: none; width: 340px; max-width: calc(100vw - 24px); background: white; border-radius: 18px; box-shadow: 0 20px 40px rgba(0,0,0,0.14); border: 1px solid #e7edf3; overflow: hidden; margin-bottom: 12px;">
             <div style="padding: 14px 16px; background: #3178c6; color: white; font-weight: 700; display: flex; align-items: center; justify-content: space-between;">
@@ -150,7 +150,8 @@
     </footer>
 
   
- <script>
+ <script src="js/api.js"></script>
+    <script>
 const profileToggle = document.getElementById('profileToggle');
 const profileDropdown = document.getElementById('profileDropdown');
 const logoutCustomerLink = document.getElementById('logoutCustomer');
@@ -193,7 +194,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if(!userId) return;
 
     try {
-        const res = await fetch(`http://localhost:5000/api/users/${userId}`);
+        const res = await fetch(`http://localhost:5000/api/users/${userId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` } });
         const data = await res.json();
         const name = data.name || 'Profile';
         document.getElementById('navUserName').textContent = name;
@@ -217,29 +218,14 @@ window.addEventListener("DOMContentLoaded", async () => {
 
             try {
                 
-                const res = await fetch("http://localhost:5000/api/reservations/create", {
+                await customerFetch("/reservations/create", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        customer_id: userId,
-                        restaurant_id: restaurant_id,
-                        group_size: group_size,
-                        reserve_date: reserve_date,
-                        reserve_time: reserve_time
-                    })
+                    body: JSON.stringify({ restaurant_id, group_size: Number(group_size), reserve_date, reserve_time })
                 });
-
-                const data = await res.json();
-
-                if (res.ok) {
-                   
-                    window.location.href = "CustomerDashboard.html";
-                } else {
-                    alert(data.message || "Failed to book table.");
-                }
+                window.location.href = "CustomerDashboard.html";
             } catch (error) {
-                console.error("Booking Error:", error);
-                alert("A network error occurred. Is your backend running?");
+                // e.g. party too big for any table there, or a time in the past
+                toast(error.message, 'error');
             }
         });
     }

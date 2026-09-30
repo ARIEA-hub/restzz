@@ -6,7 +6,7 @@
     <title>Q-Sense | Admin Sign Up</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -71,6 +71,7 @@
         <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
     </footer>
 
+    <script src="js/api.js"></script>
     <script>
     // Populate restaurant dropdown on page load
         // Populate restaurant dropdown on page load
@@ -112,9 +113,9 @@
         const confirm       = document.getElementById("confirm_password").value;
         const btn           = document.getElementById("signupBtn");
 
-        if (password !== confirm) { alert("Passwords do not match!"); return; }
-        if (!restaurant_id)       { alert("Please select a restaurant."); return; }
-        if (!role)                { alert("Please select a role."); return; }
+        if (password !== confirm) { toast("The passwords don't match.", "error"); return; }
+        if (!restaurant_id)       { toast("Choose your restaurant.", "error"); return; }
+        if (!role)                { toast("Choose your role.", "error"); return; }
 
         btn.textContent = "Creating Account...";
         btn.disabled    = true;
@@ -134,14 +135,14 @@
                 window.location.href = "OtpVerification.html";
 
             } else {
-                alert("Error: " + (data.error || data.message || "Unknown error"));
+                toast(data.message || data.error || "We couldn't create the account. Please try again.", "error");
                 btn.textContent = "Create Account";
                 btn.disabled    = false;
             }
 
         } catch (err) {
             console.error("Signup error:", err);
-            alert("A network error occurred.");
+            toast(NETWORK_ERROR, "error");
             btn.textContent = "Create Account";
             btn.disabled    = false;
         }

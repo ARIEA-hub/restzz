@@ -7,7 +7,7 @@
     
       <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -188,23 +188,27 @@
             padding-right: 5px;
         }
 
-        /* Smart pick (expert system) */
-        .smart-pick { margin-bottom: 18px; padding: 14px; border: 1px solid #dfeaf5; border-radius: 12px; background: #f8fbff; }
-        .smart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
-        .smart-head strong { color: #3178c6; white-space: nowrap; }
-        .smart-head select { padding: 5px 6px; border: 1px solid #ccc; border-radius: 6px; font: inherit; font-size: .85rem; }
-        .smart-muted { color: #667085; font-size: .8rem; margin: 6px 0 2px; }
-        .smart-item { border-top: 1px solid #e7edf3; padding: 8px 0; }
-        .smart-item summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
-        .smart-item summary::-webkit-details-marker { display: none; }
-        .smart-name { font-weight: 600; color: #1a1a1a; }
-        .smart-tag { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #eef2f6; color: #555; font-size: .72rem; font-weight: 700; }
-        .smart-item.recommend_strongly .smart-tag { background: #3178c6; color: #fff; }
-        .smart-item.recommend .smart-tag { background: #dcebfa; color: #245ea3; }
-        .smart-item.avoid .smart-tag { background: #fdecea; color: #b3261e; }
-        .smart-why ul, .smart-why ol { margin: 2px 0 4px 18px; font-size: .82rem; color: #333; }
-        .smart-why li { margin: 2px 0; }
-        .smart-route { margin-top: 6px; padding: 6px 10px; border: 1px solid #3178c6; border-radius: 6px; background: #fff; color: #3178c6; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
+        /* Recommended for you */
+        .reco { margin-bottom: 18px; padding: 14px; border: 1px solid #dfeaf5; border-radius: 12px; background: #f8fbff; }
+        .reco-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .reco-head strong { color: #3178c6; white-space: nowrap; }
+        .reco-head select { flex: 0 0 auto; width: auto; min-width: 96px; padding: 5px 6px; border: 1px solid #ccc; border-radius: 6px; font: inherit; font-size: .85rem; }
+        .reco-muted { color: #667085; font-size: .82rem; margin: 6px 0; }
+        .reco-item { border-top: 1px solid #e7edf3; padding: 10px 0 8px; }
+        .reco-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .reco-name { font-weight: 600; color: #1a1a1a; }
+        .reco-tag { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #eef2f6; color: #555; font-size: .72rem; font-weight: 700; }
+        .reco-item.recommend_strongly .reco-tag { background: #3178c6; color: #fff; }
+        .reco-item.recommend .reco-tag { background: #dcebfa; color: #245ea3; }
+        .reco-item.avoid .reco-tag { background: #fdecea; color: #b3261e; }
+        .reco-points { list-style: none; margin: 6px 0 8px; padding: 0; font-size: .82rem; color: #444; }
+        .reco-points li { margin: 2px 0; padding-left: 18px; position: relative; }
+        .reco-points li::before { content: "•"; position: absolute; left: 4px; color: #98a2b3; }
+        .reco-points li.good::before { content: "✓"; color: #1f7a45; left: 2px; }
+        .reco-points li.bad::before { content: "✕"; color: #b3261e; left: 2px; }
+        .reco-actions { display: flex; gap: 6px; }
+        .reco-actions button { padding: 5px 10px; border: 1px solid #3178c6; border-radius: 6px; background: #fff; color: #3178c6; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
+        .reco-actions button:first-child { background: #3178c6; color: #fff; }
 
         .restaurant-card {
             border: 1px solid #e1e8ed;
@@ -325,10 +329,10 @@
         <aside class="sidebar">
             <h2>Find Nearby</h2>
 
-            <div class="smart-pick">
-                <div class="smart-head">
-                    <strong>Smart pick</strong>
-                    <select id="smartPartySize" onchange="loadSmartPick()" aria-label="Party size">
+            <div class="reco">
+                <div class="reco-head">
+                    <strong>Recommended for you</strong>
+                    <select id="recoPartySize" onchange="loadRecommendations()" aria-label="Party size">
                         <option value="1">1 guest</option>
                         <option value="2" selected>2 guests</option>
                         <option value="3">3 guests</option>
@@ -337,9 +341,9 @@
                         <option value="8">8 guests</option>
                     </select>
                 </div>
-                <div id="smartPick"><p class="smart-muted">Loading…</p></div>
+                <div id="recommendations"><p class="reco-muted">Loading…</p></div>
             </div>
-            
+
             <div class="filter-group">
                 <label>Cuisine Type</label>
                 <select id="cuisineFilter" onchange="applyFilters()">
@@ -368,6 +372,7 @@
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/api.js"></script>
     <script>
      
         const userLocation = { lat: 19.0600, lng: 72.8350 };
@@ -417,8 +422,8 @@
                 let marker = L.marker([res.lat, res.lng]).addTo(map)
                 .bindPopup(`
                              <div class="popup-content">
-                                <h4>${res.name}</h4>
-                                 <p>${res.cuisine} &bull; ${res.distance} km away</p>
+                                <h4>${escapeHtml(res.name)}</h4>
+                                 <p>${escapeHtml(res.cuisine)} &bull; ${res.distance} km away</p>
                                  <br><br>
                                   <div style="display: flex; gap: 8px; flex-direction: column;">
                                     <button class="popup-btn" onclick="window.location.href='CustomerReservation.html?restaurant_id=${res.id}'">
@@ -427,11 +432,8 @@
                                     <button class="popup-btn" style="background: #f8f9fa; color: #3178c6; border: 1px solid #3178c6;" onclick="window.location.href='JoinQueue.html?restaurant_id=${res.id}'">
                                         🚶 Join Live Queue
                                     </button>
-                                    <button class="popup-btn route-btn" onclick='showWalkingRoute(${res.lat}, ${res.lng}, ${JSON.stringify(res.name)})'>
+                                    <button class="popup-btn route-btn" onclick='showWalkingRoute(${res.lat}, ${res.lng}, ${attrJson(res.name)}, ${res.id})'>
                                         Route
-                                    </button>
-                                    <button class="popup-btn route-btn" onclick='showSearchRoute(${res.id}, ${JSON.stringify(res.name)})'>
-                                        Hop route (A*)
                                     </button>
             </div>
         </div>
@@ -440,8 +442,8 @@
 
                 listContainer.innerHTML += `
                     <div class="restaurant-card" onclick="focusOnMap(${res.lat}, ${res.lng})">
-                        <h3>${res.name}</h3>
-                        <p>${res.cuisine} &bull; ${res.distance} km away</p>
+                        <h3>${escapeHtml(res.name)}</h3>
+                        <p>${escapeHtml(res.cuisine)} &bull; ${res.distance} km away</p>
                     </div>
                 `;
             });
@@ -512,18 +514,42 @@
         }
 
         // Draw a pedestrian route from the "You are here" marker to the selected restaurant.
-        async function showWalkingRoute(destinationLat, destinationLng, restaurantName) {
+        // Street directions come from OpenStreetMap routing. If that service
+        // is down, the backend plans a way there past other Q-Sense
+        // restaurants (shortest path over known locations), and only if that
+        // fails too do we fall back to a straight line.
+        async function showWalkingRoute(destinationLat, destinationLng, restaurantName, restaurantId) {
             if (walkingRoute) {
                 map.removeLayer(walkingRoute);
             }
 
-            const fallbackRoute = () => {
+            const straightLine = () => {
                 walkingRoute = L.polyline(
                     [[userLocation.lat, userLocation.lng], [destinationLat, destinationLng]],
                     { color: '#3178c6', weight: 5, opacity: 0.85, dashArray: '8 8' }
                 ).addTo(map);
                 map.fitBounds(walkingRoute.getBounds(), { padding: [40, 40] });
-                alert(`Walking directions are unavailable right now. Showing the direct path to ${restaurantName}.`);
+                toast(`Walking directions are unavailable right now. Showing the direct line to ${restaurantName}.`);
+            };
+
+            const viaRestaurants = async () => {
+                if (restaurantId == null) return false;
+                const res = await fetch(`http://localhost:5000/api/restaurant/route?lat=${userLocation.lat}&lng=${userLocation.lng}&to=${restaurantId}&walk_km=5`);
+                if (!res.ok) return false;
+                const route = await res.json();
+                if (!route.found || route.hops < 2) return false; // a single hop is just the straight line
+
+                walkingRoute = L.polyline(route.path.map((p) => [p.lat, p.lng]), {
+                    color: '#3178c6', weight: 5, opacity: 0.85, dashArray: '2 8'
+                }).addTo(map);
+                map.fitBounds(walkingRoute.getBounds(), { padding: [40, 40] });
+                const stops = route.path.slice(1, -1).map((p) => escapeHtml(p.name)).join(', then ');
+                walkingRoute.bindPopup(`
+                    <div class="popup-content">
+                        <h4>Getting to ${escapeHtml(restaurantName)}</h4>
+                        <p>Street directions aren't available right now. Head for ${stops}, then on to ${escapeHtml(restaurantName)}: about ${route.distance_km.toFixed(1)} km.</p>
+                    </div>`).openPopup();
+                return true;
             };
 
             try {
@@ -544,84 +570,62 @@
                 map.fitBounds(walkingRoute.getBounds(), { padding: [40, 40] });
             } catch (error) {
                 console.warn('Walking route could not be loaded:', error);
-                fallbackRoute();
+                try {
+                    if (!(await viaRestaurants())) straightLine();
+                } catch (fallbackError) {
+                    console.warn('Route via restaurants unavailable:', fallbackError);
+                    straightLine();
+                }
             }
         }
 
-
-        // ── Smart pick: rule-based expert system (forward chaining) ────────
-        const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-        const CONCLUSION_TEXT = {
-            recommend_strongly: 'Top pick',
-            recommend: 'Good pick',
-            consider: 'Possible',
+        // ── Recommended for you ──────────────────────────────────────────
+        // The backend's rules weigh free tables that fit the party, the
+        // queue, and distance; each pick comes with the reasons behind it.
+        const PICK_LABEL = {
+            recommend_strongly: 'Best right now',
+            recommend: 'Good option',
+            consider: 'Maybe',
             avoid: 'Not ideal'
         };
 
-        async function loadSmartPick() {
-            const box = document.getElementById('smartPick');
-            const partySize = document.getElementById('smartPartySize').value;
-            box.innerHTML = '<p class="smart-muted">Checking rules…</p>';
+        async function loadRecommendations() {
+            const box = document.getElementById('recommendations');
+            const partySize = document.getElementById('recoPartySize').value;
+            box.innerHTML = '<p class="reco-muted">Finding the best spots…</p>';
             try {
                 const res = await fetch(`http://localhost:5000/api/restaurant/expert-recommend?party_size=${partySize}&lat=${userLocation.lat}&lng=${userLocation.lng}`);
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message || 'Recommendation failed');
                 const top = data.recommendations.slice(0, 3);
                 if (!top.length) {
-                    box.innerHTML = '<p class="smart-muted">No open restaurants right now.</p>';
+                    box.innerHTML = '<p class="reco-muted">No restaurants are open right now.</p>';
                     return;
                 }
-                box.innerHTML = top.map((r, i) => `
-                    <details class="smart-item ${r.conclusion}" ${i === 0 ? 'open' : ''}>
-                        <summary>
-                            <span class="smart-name">${escapeHtml(r.name)}</span>
-                            <span class="smart-tag">${CONCLUSION_TEXT[r.conclusion]}</span>
-                        </summary>
-                        <div class="smart-why">
-                            <div class="smart-muted">What we know right now</div>
-                            <ul>${r.base_facts.map((f) => `<li>${escapeHtml(f.detail)}</li>`).join('')}</ul>
-                            <div class="smart-muted">Why this conclusion</div>
-                            <ol>${r.derived.map((d) => `<li><strong>${d.rule}</strong> ${escapeHtml(d.text)}</li>`).join('') || '<li>No rule applied.</li>'}</ol>
-                            ${r.why_not_strong ? `<div class="smart-muted">Not a top pick because it is missing: ${escapeHtml([...new Set(r.why_not_strong.flatMap((w) => w.missing))].join(', ').replace(/_/g, ' '))}</div>` : ''}
-                            ${r.latitude != null ? `<button type="button" class="smart-route" onclick='showSearchRoute(${r.restaurant_id}, ${JSON.stringify(r.name)})'>Show hop route</button>` : ''}
+                box.innerHTML = top.map((r) => `
+                    <div class="reco-item ${r.conclusion}">
+                        <div class="reco-top">
+                            <span class="reco-name">${escapeHtml(r.name)}</span>
+                            <span class="reco-tag">${PICK_LABEL[r.conclusion]}</span>
                         </div>
-                    </details>`).join('');
+                        <ul class="reco-points">
+                            ${r.highlights.map((h) => `<li class="${h.good === true ? 'good' : h.good === false ? 'bad' : ''}">${escapeHtml(h.text)}</li>`).join('')}
+                        </ul>
+                        <div class="reco-actions">
+                            <button type="button" onclick="window.location.href='JoinQueue.html?restaurant_id=${r.restaurant_id}'">Join queue</button>
+                            ${r.latitude != null ? `<button type="button" onclick='showWalkingRoute(${Number(r.latitude)}, ${Number(r.longitude)}, ${attrJson(r.name)}, ${r.restaurant_id})'>Route</button>` : ''}
+                        </div>
+                    </div>`).join('');
             } catch (error) {
-                console.warn('Smart pick unavailable:', error);
-                box.innerHTML = '<p class="smart-muted">Recommendations are unavailable right now.</p>';
-            }
-        }
-
-        // ── Hop route: A* over the restaurant graph (UCS/Greedy compared) ──
-        async function showSearchRoute(restaurantId, restaurantName) {
-            if (walkingRoute) map.removeLayer(walkingRoute);
-            try {
-                const res = await fetch(`http://localhost:5000/api/restaurant/route?lat=${userLocation.lat}&lng=${userLocation.lng}&to=${restaurantId}&algorithm=compare&walk_km=5`);
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'Route failed');
-                const { astar, ucs, greedy } = data.results;
-                if (!astar.found) {
-                    alert(`${restaurantName} can't be reached by hops of 5 km or less between restaurants.`);
-                    return;
-                }
-                walkingRoute = L.polyline(astar.path.map((p) => [p.lat, p.lng]), { color: '#3178c6', weight: 5, opacity: 0.85 }).addTo(map);
-                map.fitBounds(walkingRoute.getBounds(), { padding: [40, 40] });
-                walkingRoute.bindPopup(`
-                    <div class="popup-content">
-                        <h4>${escapeHtml(astar.path.map((p) => p.name).join(' → '))}</h4>
-                        <p>${astar.distance_km} km over ${astar.hops} hop${astar.hops === 1 ? '' : 's'} (straight line: ${astar.straight_line_km} km)</p>
-                        <p style="margin-top:6px;">Places checked to find this route: A* ${astar.nodes_expanded} · UCS ${ucs.nodes_expanded} · Greedy ${greedy.nodes_expanded}${greedy.distance_km !== astar.distance_km ? ` (Greedy's route is longer: ${greedy.distance_km} km)` : ''}</p>
-                    </div>`).openPopup();
-            } catch (error) {
-                console.warn('Hop route unavailable:', error);
-                alert('Hop route is unavailable right now.');
+                console.warn('Recommendations unavailable:', error);
+                box.innerHTML = '<p class="reco-muted">Recommendations are unavailable right now.</p>';
             }
         }
 
         // Initial render on page load
         renderData(restaurants);
         loadRegisteredRestaurants();
-        loadSmartPick();
+        loadRecommendations();
 
 
     const profileToggle = document.getElementById('profileToggle');
@@ -663,7 +667,7 @@
 
     try{
 
-        const res = await fetch(`http://localhost:5000/api/users/${userId}`);
+        const res = await fetch(`http://localhost:5000/api/users/${userId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` } });
         const data = await res.json();
 
         const name = data.name || 'Profile';
@@ -678,7 +682,7 @@
 });
     </script>
 
-    <div id="qsense-chatbot" style="position: fixed; right: 22px; bottom: 22px; z-index: 9999; font-family: 'Inter', sans-serif;">
+    <div id="qsense-chatbot" style="position: fixed; right: 22px; bottom: 22px; z-index: 9999; font-family: var(--font-sans);">
         <button id="chatbot-toggle" type="button" style="width: 64px; height: 64px; border: none; border-radius: 50%; background: linear-gradient(135deg, #3178c6, #245ea3); color: white; font-size: 28px; box-shadow: 0 12px 30px rgba(49,120,198,0.35); cursor: pointer;">💬</button>
         <div id="chatbot-panel" style="display: none; width: 340px; max-width: calc(100vw - 24px); background: white; border-radius: 18px; box-shadow: 0 20px 40px rgba(0,0,0,0.14); border: 1px solid #e7edf3; overflow: hidden; margin-bottom: 12px;">
             <div style="padding: 14px 16px; background: #3178c6; color: white; font-weight: 700; display: flex; align-items: center; justify-content: space-between;">

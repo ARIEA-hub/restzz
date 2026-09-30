@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Q-Sense | Live Waitlist</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-sans); }
         body { background-color: #f4f7f9; display: flex; flex-direction: column; align-items: stretch; min-height: 100vh; padding: 0; }
 
         .navbar { min-height: 70px; padding: 14px 40px; background: #fff; border-bottom: 1px solid #e1e8ed; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 2000; }
@@ -49,8 +49,9 @@
         .input-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
         .input-group select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
         
-        .btn { width: 100%; background: #3178c6; color: white; border: none; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn:hover { background: #255a96; }
+        .join-btn { width: 100%; background: #3178c6; color: white; border: none; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .join-btn:hover { background: #255a96; }
+        .join-btn:disabled { opacity: .6; }
         .leave-btn { width: 100%; margin-top: 12px; padding: 11px 15px; border: 1px solid #d9534f; border-radius: 8px; background: #fff; color: #d9534f; font: inherit; font-weight: 600; cursor: pointer; transition: background 0.2s, color 0.2s; }
         .leave-btn:hover { background: #d9534f; color: #fff; }
 
@@ -95,18 +96,18 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Tic-tac-toe vs. AI (minimax / alpha-beta) — shown while waiting */
+        /* Tic-tac-toe while waiting */
         #ttt-container { margin-top: 28px; padding-top: 22px; border-top: 1px solid #e1e8ed; text-align: left; }
         .ttt-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; color: #333; }
-        .ttt-algo { font-size: 0.85rem; color: #555; }
-        .ttt-algo select { margin-left: 4px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 6px; font: inherit; }
+        .ttt-levels { display: inline-flex; border: 1px solid #dfeaf5; border-radius: 999px; overflow: hidden; }
+        .ttt-levels button { padding: 5px 12px; border: 0; background: #fff; color: #555; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+        .ttt-levels button[aria-pressed="true"] { background: #3178c6; color: #fff; }
         .ttt-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(100%, 240px); margin: 0 auto; }
         .ttt-cell { aspect-ratio: 1; border: 2px solid #dfeaf5; border-radius: 10px; background: #f8fbff; color: #3178c6; font-size: 2rem; font-weight: 700; cursor: pointer; }
         .ttt-cell:disabled { cursor: default; color: #1a1a1a; }
         .ttt-cell:not(:disabled):hover { border-color: #3178c6; }
         .ttt-cell.ttt-win { background: #eef5fb; border-color: #3178c6; }
         .ttt-status { margin-top: 12px; text-align: center; font-weight: 600; color: #333; }
-        .ttt-stats { margin-top: 6px; min-height: 1.2em; text-align: center; font-size: 0.8rem; color: #777; }
         .ttt-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 0.85rem; color: #555; }
         .ttt-foot button { padding: 6px 12px; border: 1px solid #3178c6; border-radius: 6px; background: #fff; color: #3178c6; font: inherit; font-weight: 600; cursor: pointer; }
     </style>
@@ -138,193 +139,198 @@
 
     <div class="queue-card">
         <h2>Live Waitlist</h2>
-        <p class="subtitle" id="restaurant-display">Loading restaurant info...</p>
+        <p class="subtitle" id="restaurant-display">Loading restaurant…</p>
 
         <div id="join-section">
             <form id="join-form">
                 <div class="input-group">
-                    <label>How many people in your party?</label>
+                    <label for="group-size">How many people in your party?</label>
                     <select id="group-size" required>
-                        <option value="1">1 Person</option>
-                        <option value="2" selected>2 People</option>
-                        <option value="3">3 People</option>
-                        <option value="4">4 People</option>
-                        <option value="5">5 People</option>
-                        <option value="6">6+ People</option>
+                        <option value="1">1 person</option>
+                        <option value="2" selected>2 people</option>
+                        <option value="3">3 people</option>
+                        <option value="4">4 people</option>
+                        <option value="5">5 people</option>
+                        <option value="6">6 people</option>
+                        <option value="7">7 people</option>
+                        <option value="8">8 people</option>
                     </select>
+                    <p class="muted" style="margin-top:6px;">More than 8? Please call the restaurant.</p>
                 </div>
-                <button type="submit" class="btn">Join Waitlist</button>
+                <button type="submit" class="join-btn">Join the waitlist</button>
             </form>
         </div>
 
         <div id="tracker-section">
             <div class="ticket">
-                <div class="position-label">Your Position</div>
+                <div class="position-label">Your position</div>
                 <div class="position-number" id="display-position">--</div>
                 <div class="status-badge" id="display-status">Waiting</div>
             </div>
 
-            <div class="wait-time"><span class="loader"></span> Estimated Wait: <span id="display-ewt">--</span> min</div>
-            <div class="people-ahead" id="display-ahead">-- parties ahead of you</div>
-            <button id="leave-queue-btn" class="leave-btn" type="button">Leave Queue</button>
+            <div class="wait-time"><span class="loader"></span> Estimated wait: <span id="display-ewt">--</span> min</div>
+            <div class="people-ahead" id="display-ahead"></div>
+            <button id="leave-queue-btn" class="leave-btn" type="button">Leave the queue</button>
             <div id="ttt-container"></div>
         </div>
     </div>
 
+    <script src="js/api.js"></script>
     <script src="js/tictactoe.js"></script>
     <script>
-      
         const urlParams = new URLSearchParams(window.location.search);
         const restaurantId = urlParams.get('restaurant_id');
-        const customerId = localStorage.getItem('customer_id'); 
-        
+        const customerId = localStorage.getItem('customer_id');
         let pollingInterval;
 
-        window.addEventListener("DOMContentLoaded", () => {
-           
-            if (!customerId) {
-                alert("Please log in to join the queue!");
-                window.location.href = "CustomerLogin.html"; 
+        const queueMap = () => JSON.parse(localStorage.getItem('active_queue_map') || '{}');
+        function rememberQueue(queueId) {
+            const map = queueMap();
+            map[restaurantId] = queueId;
+            localStorage.setItem('active_queue_map', JSON.stringify(map));
+            localStorage.setItem('current_queue_id', queueId);
+        }
+        function forgetQueue() {
+            clearInterval(pollingInterval);
+            const map = queueMap();
+            delete map[restaurantId];
+            localStorage.setItem('active_queue_map', JSON.stringify(map));
+            localStorage.removeItem('current_queue_id');
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            if (!customerId || !localStorage.getItem('auth_token')) {
+                window.location.href = 'CustomerLogin.html';
                 return;
             }
+            const display = document.getElementById('restaurant-display');
             if (!restaurantId) {
-                document.getElementById("restaurant-display").textContent = "Error: No restaurant selected.";
-                document.getElementById("join-section").style.display = "none";
+                display.textContent = 'Choose a restaurant from the Locations page first.';
+                document.getElementById('join-section').style.display = 'none';
                 return;
             }
-
-            document.getElementById("restaurant-display").textContent = `Restaurant ID: ${restaurantId}`;
-
-            // Check if they are already in a queue! (Resume session)
-            const queueMap = JSON.parse(localStorage.getItem('active_queue_map') || '{}');
-            const savedQueueId = queueMap[restaurantId] || null;
-            if (savedQueueId) {
-                switchToTracker(savedQueueId);
-            }
-        });
-
-        
-        document.getElementById("join-form").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const groupSize = document.getElementById("group-size").value;
 
             try {
-                const res = await fetch("http://localhost:5000/api/queue/join", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem('auth_token') || ''}`
-                    },
-                    body: JSON.stringify({
-                        restaurant_id: restaurantId,
-                        customer_id: customerId,
-                        group_size: groupSize
-                    })
-                });
-
-                const data = await res.json();
-
-                if (res.ok) {
-                   
-                    const queueMap = JSON.parse(localStorage.getItem('active_queue_map') || '{}');
-                    queueMap[restaurantId] = data.queue_id;
-                    localStorage.setItem('active_queue_map', JSON.stringify(queueMap));
-                    localStorage.setItem('current_queue_id', data.queue_id);
-                    switchToTracker(data.queue_id);
-                } else {
-                    alert(data.message); 
-                }
+                const restaurant = await apiFetch(`/restaurant/${encodeURIComponent(restaurantId)}`);
+                display.textContent = restaurant.name;
             } catch (error) {
-                console.error("Error joining:", error);
-                alert("Failed to join. Check connection.");
+                display.textContent = 'Restaurant not found.';
+                document.getElementById('join-section').style.display = 'none';
+                return;
+            }
+
+            const savedQueueId = queueMap()[restaurantId];
+            if (savedQueueId) switchToTracker(savedQueueId);
+        });
+
+        document.getElementById('join-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const button = e.submitter || e.target.querySelector('button[type="submit"]');
+            button.disabled = true;
+            try {
+                const data = await customerFetch('/queue/join', {
+                    method: 'POST',
+                    body: JSON.stringify({ restaurant_id: restaurantId, group_size: Number(document.getElementById('group-size').value) })
+                });
+                rememberQueue(data.queue_id);
+                switchToTracker(data.queue_id);
+            } catch (error) {
+                // Already in this queue: pick up the existing ticket.
+                if (error.status === 409 && error.data && error.data.queue_id) {
+                    rememberQueue(error.data.queue_id);
+                    switchToTracker(error.data.queue_id);
+                } else {
+                    toast(error.message, 'error');
+                }
+            } finally {
+                button.disabled = false;
             }
         });
 
-        
         function switchToTracker(queueId) {
-            document.getElementById("join-section").style.display = "none";
-            document.getElementById("tracker-section").style.display = "block";
-            
+            document.getElementById('join-section').style.display = 'none';
+            document.getElementById('tracker-section').style.display = 'block';
+            document.getElementById('leave-queue-btn').hidden = false;
+            document.querySelector('.wait-time .loader').hidden = false;
             if (!document.querySelector('#ttt-container .ttt')) {
                 TicTacToe.mount(document.getElementById('ttt-container'));
             }
+            clearInterval(pollingInterval);
             fetchQueueStatus(queueId);
             pollingInterval = setInterval(() => fetchQueueStatus(queueId), 5000);
+        }
+
+        function showJoinForm() {
+            document.getElementById('tracker-section').style.display = 'none';
+            document.getElementById('join-section').style.display = 'block';
         }
 
         async function leaveQueue(queueId) {
             const leaveButton = document.getElementById('leave-queue-btn');
             leaveButton.disabled = true;
-
             try {
-                const res = await fetch(`http://localhost:5000/api/queue/leave/${queueId}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
-                    }
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'Failed to leave queue.');
-
-                clearInterval(pollingInterval);
-                const queueMap = JSON.parse(localStorage.getItem('active_queue_map') || '{}');
-                delete queueMap[restaurantId];
-                localStorage.setItem('active_queue_map', JSON.stringify(queueMap));
-                localStorage.removeItem('current_queue_id');
-                document.getElementById('tracker-section').style.display = 'none';
-                document.getElementById('join-section').style.display = 'block';
-                alert('You have left the queue.');
+                await customerFetch(`/queue/leave/${queueId}`, { method: 'PATCH' });
+                forgetQueue();
+                showJoinForm();
+                toast('You have left the queue.');
             } catch (error) {
-                console.error('Error leaving queue:', error);
+                toast(error.message, 'error');
+            } finally {
                 leaveButton.disabled = false;
-                alert(error.message);
             }
         }
 
         document.getElementById('leave-queue-btn').addEventListener('click', () => {
-            const queueId = localStorage.getItem('current_queue_id');
-            if (queueId && confirm('Leave this queue?')) leaveQueue(queueId);
+            const queueId = localStorage.getItem('current_queue_id') || queueMap()[restaurantId];
+            if (queueId && confirm('Leave the queue? You will lose your place.')) leaveQueue(queueId);
         });
+
+        // The ticket is finished: stop polling and show the outcome.
+        function finish(label, symbol) {
+            forgetQueue();
+            document.getElementById('display-status').textContent = label;
+            document.getElementById('display-status').className = 'status-badge';
+            document.getElementById('display-position').textContent = symbol;
+            document.getElementById('display-ahead').textContent = '';
+            document.getElementById('display-ewt').textContent = '0';
+            document.querySelector('.wait-time .loader').hidden = true;
+            document.getElementById('leave-queue-btn').hidden = true;
+        }
 
         async function fetchQueueStatus(queueId) {
             try {
-                const res = await fetch(`http://localhost:5000/api/queue/status/${queueId}`, {
-                    headers: {
-                        "Authorization": `Bearer ${localStorage.getItem('auth_token') || ''}`
-                    }
-                });
-                const data = await res.json();
+                const data = await customerFetch(`/queue/status/${queueId}`);
+                const badge = document.getElementById('display-status');
 
-                if (res.ok) {
-                
-                    document.getElementById("display-position").textContent = data.position;
-                    document.getElementById("display-ewt").textContent = data.estimated_wait_time;
-                    document.getElementById("display-ewt").title = data.estimate_source === 'decision_tree'
-                        ? 'Predicted by a decision-tree model trained on past waits'
-                        : 'Rule-of-thumb estimate (5 min per party ahead)';
-                    document.getElementById("display-ahead").textContent = `${data.people_ahead} parties ahead of you`;
-
-                    const statusBadge = document.getElementById("display-status");
-                    
-                    if (data.status === 'waiting') {
-                        statusBadge.textContent = "Waiting in Line";
-                        statusBadge.className = "status-badge";
-                    } else if (data.status === 'called') {
-                        statusBadge.textContent = "Your name is being called! Go to the host stand and get ready for your meal/";
-                        statusBadge.className = "status-badge called";
-                    } else if (data.status === 'seated' || data.status === 'cancelled') {
-                       
-                        clearInterval(pollingInterval);
-                        const queueMap = JSON.parse(localStorage.getItem('active_queue_map') || '{}');
-                        delete queueMap[restaurantId];
-                        localStorage.setItem('active_queue_map', JSON.stringify(queueMap));
-                        localStorage.removeItem('current_queue_id');
-                        statusBadge.textContent = data.status === 'seated' ? "Enjoy your meal!" : "Queue Cancelled";
-                        document.getElementById("display-position").textContent = "✓";
+                if (data.status === 'waiting' || data.status === 'called') {
+                    document.getElementById('display-position').textContent = data.position;
+                    const ewt = document.getElementById('display-ewt');
+                    ewt.textContent = data.estimated_wait_time;
+                    ewt.title = data.estimate_source === 'decision_tree'
+                        ? 'Predicted from the queue, free tables and time of day'
+                        : 'Rough estimate: about 5 minutes per party ahead';
+                    document.getElementById('display-ahead').textContent =
+                        data.people_ahead === 0 ? "You're next." : `${data.people_ahead} ${data.people_ahead === 1 ? 'party' : 'parties'} ahead of you`;
+                    if (data.status === 'called') {
+                        badge.textContent = "You're being called. Please go to the host stand.";
+                        badge.className = 'status-badge called';
+                    } else {
+                        badge.textContent = 'Waiting';
+                        badge.className = 'status-badge';
                     }
+                } else if (data.status === 'seated') {
+                    finish('Your table is ready. Enjoy your meal.', '✓');
+                } else if (data.status === 'left') {
+                    finish('You are no longer in this queue.', '–');
                 }
             } catch (error) {
-                console.error("Polling error:", error);
+                // The ticket no longer exists (e.g. cleared by staff): start over.
+                if (error.status === 404) {
+                    forgetQueue();
+                    showJoinForm();
+                } else {
+                    console.error('Polling error:', error);
+                }
             }
         }
     </script>

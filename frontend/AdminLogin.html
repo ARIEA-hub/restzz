@@ -6,7 +6,7 @@
     <title>Q-Sense | Admin Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -50,6 +50,7 @@
         <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
     </footer>
 
+    <script src="js/api.js"></script>
     <script>
     document.getElementById("adminLogin").addEventListener("submit", async function(e) {
         e.preventDefault();
@@ -86,7 +87,7 @@
 
             } else if (res.status === 403 && data.requires_otp) {
                 // Admin account not yet verified — send to OTP page
-                alert("Account not yet verified. A verification code will be sent to your email.");
+                flash("Your account isn't verified yet. Enter the code we've emailed you.");
                 localStorage.setItem("temp_email", data.email);
                 localStorage.setItem("temp_role",  "admin");
 
@@ -99,14 +100,14 @@
                 window.location.href = "OtpVerification.html";
 
             } else {
-                alert(data.message || "Login failed. Check your credentials.");
+                toast(data.message || "Wrong email or password.", "error");
                 btn.textContent = "Log In";
                 btn.disabled = false;
             }
 
         } catch (error) {
             console.error("Admin Login error:", error);
-            alert("A network error occurred.");
+            toast(NETWORK_ERROR, "error");
             btn.textContent = "Log In";
             btn.disabled = false;
         }

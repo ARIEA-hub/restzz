@@ -6,7 +6,7 @@
     <title>Q-Sense | Create Account</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -67,6 +67,7 @@
         <p>&copy; 2026 Q-Sense Inc. &bull; <a href="#">Privacy</a> &bull; <a href="#">Terms</a></p>
     </footer>
 
+    <script src="js/api.js"></script>
     <script>
     document.getElementById("signup").addEventListener("submit", async function(e) {
         e.preventDefault();
@@ -80,7 +81,7 @@
 
         // Client-side password match check
         if (password !== confirm) {
-            alert("Passwords do not match.");
+            toast("The passwords don't match.", "error");
             return;
         }
 
@@ -107,17 +108,19 @@
                 window.location.href = "OtpVerification.html";
 
             } else if (res.status === 409) {
-                alert("An account with this email already exists. Please log in.");
+                toast("An account with this email already exists. Log in instead.", "error");
+                btn.textContent = "Sign Up";
+                btn.disabled = false;
 
             } else {
-                alert(data.error || data.message || "Registration failed. Please try again.");
+                toast(data.message || data.error || "We couldn't create your account. Please try again.", "error");
                 btn.textContent = "Sign Up";
                 btn.disabled = false;
             }
 
         } catch (error) {
             console.error("Registration error:", error);
-            alert("A network error occurred. Is the server running?");
+            toast(NETWORK_ERROR, "error");
             btn.textContent = "Sign Up";
             btn.disabled = false;
         }
