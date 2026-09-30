@@ -1,8 +1,8 @@
-# The "Smart pick" expert system
+# The "Recommended for you" expert system
 
-`api/utils/expertSystem.js` · `GET /api/restaurant/expert-recommend` · shown on `locations.html`
+`api/utils/expertSystem.js` · `GET /api/restaurant/expert-recommend` · the *Recommended for you* panel on `locations.html`
 
-A small rule-based expert system that answers "where should this party eat right now, and why?". It exists to demonstrate knowledge representation and inference properly. It is not a scoring formula in disguise: every conclusion is derived by rules, and every "why" is the actual chain of rules that fired.
+Guests pick a party size and get the best places to go right now, each with short reasons ("✓ Table for 4 free now · ✓ No queue · ✓ 0.2 km, walkable"). Behind that panel is a small rule-based expert system. It is not a scoring formula in disguise: every conclusion is derived by rules, and the reasons shown are built from what those rules actually derived.
 
 ## Architecture
 
@@ -49,7 +49,7 @@ The final conclusion is the strongest positive one derived: `recommend_strongly`
 
 ### Explanation facility
 
-A response for one restaurant (trimmed):
+Two audiences get the same reasoning at different levels of detail. Guests see `highlights`: short ✓/✕ points written from the *derived* facts (for example `can_seat_now` becomes "Table for 4 free now"), so the explanation can never disagree with the decision. Developers get the full trail. A response for one restaurant (trimmed):
 
 ```json
 {
@@ -64,7 +64,12 @@ A response for one restaurant (trimmed):
     { "rule": "R1", "premises": ["has_vacant_table", "fits_party"], "conclusion": "can_seat_now" },
     { "rule": "R6", "premises": ["quick_seating", "nearby"], "conclusion": "recommend_strongly" }
   ],
-  "why_not_strong": null
+  "why_not_strong": null,
+  "highlights": [
+    { "good": true, "text": "Table for 4 free now" },
+    { "good": true, "text": "No queue" },
+    { "good": true, "text": "0.2 km, walkable" }
+  ]
 }
 ```
 
