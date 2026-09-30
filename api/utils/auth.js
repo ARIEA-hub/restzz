@@ -1,7 +1,9 @@
 // api/utils/auth.js
-// JWT helpers shared by the routes added for the AI/algorithm features.
+// JWT checks shared by the routes. Admin tokens carry { admin_id,
+// restaurant_id, role }; customer tokens carry { customer_id }.
 
 const jwt = require('jsonwebtoken');
+const db = require('../database');
 
 function verifyBearer(req) {
     const authorization = req.headers.authorization || '';
@@ -14,8 +16,8 @@ function verifyBearer(req) {
 }
 
 /**
- * Express middleware: requires an admin token, and — when the route has a
- * :restaurantId — that the admin belongs to that restaurant.
+ * Requires an admin token. When the route has a :restaurantId, the admin
+ * must belong to that restaurant.
  */
 function requireAdmin(req, res, next) {
     const admin = verifyBearer(req);
@@ -30,4 +32,29 @@ function requireAdmin(req, res, next) {
     next();
 }
 
-module.exports = { verifyBearer, requireAdmin };
+/** Requires a customer token; sets req.customerId. */
+function requireCustomer(req, res, next) {
+    const token = verifyBearer(req);
+    if (!token || !token.customer_id) {
+        return res.status(401).json({ message: 'Please log in again.' });
+    }
+    req.customerId = token.customer_id;
+    next();
+}
+
+/**
+ * For admin routes addressed by a row id (a queue entry, table or
+ * reservation) rather than a restaurant id: checks the row belongs to the
+ * admin's restaurant. `table` and `idColumn` are fixed strings from the
+ * route, never user input. Returns true, or sends 404 and returns false.
+ */
+async function adminOwnsRow(req, res, table, idColumn, id) {
+    const [rows] = await db.query(`SELECT restaurant_id FROM ${table} WHERE ${idColumn} = $1`, [id]);
+    if (rows.length === 0 || String(rows[0].restaurant_id) !== String(req.admin.restaurant_id)) {
+        res.status(404).json({ message: 'Not found.' });
+        return false;
+    }
+    return true;
+}
+
+module.exports = { verifyBearer, requireAdmin, requireCustomer, adminOwnsRow };

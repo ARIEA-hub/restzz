@@ -4,6 +4,7 @@
 const express      = require('express');
 const router       = express.Router();
 const db           = require('../database');
+const { requireCustomer } = require('../utils/auth');
 const bcrypt       = require('bcrypt');
 const jwt          = require('jsonwebtoken');
 const nodemailer   = require('nodemailer');
@@ -166,7 +167,11 @@ router.post('/login', async (req, res) => {
 });
 
 // ── GET /api/users/:id ───────────────────────────────────────────────
-router.get('/:id', async (req, res) => {
+// Profile of the logged-in customer only (it includes email and phone).
+router.get('/:id', requireCustomer, async (req, res) => {
+    if (String(req.params.id) !== String(req.customerId)) {
+        return res.status(403).json({ message: 'You can only view your own profile.' });
+    }
     try {
         const [rows] = await db.query(
             'SELECT name, email, phone FROM customer WHERE customer_id = $1',

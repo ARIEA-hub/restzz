@@ -3,22 +3,26 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../database');
+const { requireAdmin, requireCustomer } = require('../utils/auth');
+const { createReservation, syncReservationTable } = require('../utils/bookings');
+
+const RESTAURANT_TZ = process.env.RESTAURANT_TZ || 'Asia/Kolkata';
 
 // ── POST /api/reservations/create ────────────────────────────────────
-router.post('/create', async (req, res) => {
-    const { customer_id, restaurant_id, group_size, reserve_date, reserve_time } = req.body;
-
-    if (!customer_id || !restaurant_id || !group_size || !reserve_date || !reserve_time) {
-        return res.status(400).json({ success: false, message: 'All reservation fields are required.' });
-    }
-
+// The customer comes from the login token, never the request body, so a
+// guest can only book for themselves.
+router.post('/create', requireCustomer, async (req, res) => {
+    const { restaurant_id, group_size, reserve_date, reserve_time } = req.body;
     try {
-        await db.query(
-            `INSERT INTO reservation (customer_id, restaurant_id, group_size, reserve_date, reserve_time)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [customer_id, restaurant_id, group_size, reserve_date, reserve_time]
-        );
-        res.json({ success: true, message: 'Reservation confirmed!' });
+        const result = await createReservation({
+            customerId: req.customerId,
+            restaurantId: restaurant_id,
+            groupSize: group_size,
+            date: reserve_date,
+            time: reserve_time
+        });
+        if (result.error) return res.status(result.status).json({ success: false, message: result.error });
+        res.json({ success: true, reserve_id: result.reserve_id, message: `Table booked at ${result.restaurant.name}.` });
     } catch (error) {
         console.error('Error creating reservation:', error);
         res.status(500).json({ success: false, message: 'Failed to book table.' });
@@ -26,11 +30,14 @@ router.post('/create', async (req, res) => {
 });
 
 // ── GET /api/reservations/user/:customerId ────────────────────────────
-// Bug A fix: TO_CHAR replaces DATE_FORMAT and TIME_FORMAT
-router.get('/user/:customerId', async (req, res) => {
-    const customerId = req.params.customerId;
+// Upcoming bookings for the logged-in customer (the :customerId must be
+// their own). "Upcoming" is judged on the restaurant's clock.
+router.get('/user/:customerId', requireCustomer, async (req, res) => {
+    if (String(req.params.customerId) !== String(req.customerId)) {
+        return res.status(403).json({ message: 'You can only view your own reservations.' });
+    }
     try {
-        const query = `
+        const [reservations] = await db.query(`
             SELECT
                 res.reserve_id   AS reservation_id,
                 res.group_size   AS party_size,
@@ -42,9 +49,9 @@ router.get('/user/:customerId', async (req, res) => {
             JOIN restaurant r ON res.restaurant_id = r.restaurant_id
             WHERE res.customer_id = $1
               AND res.status = 'reserved'
+              AND (res.reserve_date + res.reserve_time) >= (NOW() AT TIME ZONE $2)
             ORDER BY res.reserve_date ASC, res.reserve_time ASC
-        `;
-        const [reservations] = await db.query(query, [customerId]);
+        `, [req.customerId, RESTAURANT_TZ]);
         res.json(reservations);
     } catch (error) {
         console.error('Error fetching reservations:', error);
@@ -53,26 +60,41 @@ router.get('/user/:customerId', async (req, res) => {
 });
 
 // ── DELETE /api/reservations/:reserveId ──────────────────────────────
-router.delete('/:reserveId', async (req, res) => {
+// A customer cancels their own upcoming booking. If a table was already
+// set aside for it, that table is freed.
+router.delete('/:reserveId', requireCustomer, async (req, res) => {
+    const client = await db.getClient();
     try {
-        await db.query(
-            "UPDATE reservation SET status = 'cancelled' WHERE reserve_id = $1",
-            [req.params.reserveId]
+        await client.query('BEGIN');
+        const { rows } = await client.query(
+            `UPDATE reservation SET status = 'cancelled'
+             WHERE reserve_id = $1 AND customer_id = $2 AND status = 'reserved'
+               AND (reserve_date + reserve_time) >= (NOW() AT TIME ZONE $3)
+             RETURNING reserve_id`,
+            [req.params.reserveId, req.customerId, RESTAURANT_TZ]
         );
+        if (rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Upcoming reservation not found.' });
+        }
+        await syncReservationTable(client, req.params.reserveId, 'cancelled');
+        await client.query('COMMIT');
         res.json({ success: true, message: 'Reservation cancelled.' });
     } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error cancelling reservation:', error);
         res.status(500).json({ message: 'Failed to cancel reservation.' });
+    } finally {
+        client.release();
     }
 });
 
 // ── PATCH /api/reservations/:reserveId/status ────────────────────────
-// General admin status-setter — added so admins have a way to mark a
-// reservation as 'no_show', which previously had no path in the app at
-// all (only 'cancelled', via the customer-facing DELETE above). This is
-// what makes the admin customer-behavior-summary feature meaningful —
-// without a way to ever record a no-show, "no-show rate" could never
-// be anything but zero.
-router.patch('/:reserveId/status', async (req, res) => {
+// Staff mark a booking seated, completed, cancelled or a no-show. The
+// no-show status is what makes the customer summary's no-show rate
+// meaningful. The reservation's table (if any) follows: freed on
+// cancel / no-show / completed, occupied on seated.
+router.patch('/:reserveId/status', requireAdmin, async (req, res) => {
     const { status } = req.body;
     const validStatuses = ['reserved', 'seated', 'cancelled', 'completed', 'no_show'];
 
@@ -80,18 +102,26 @@ router.patch('/:reserveId/status', async (req, res) => {
         return res.status(400).json({ message: `Status must be one of: ${validStatuses.join(', ')}` });
     }
 
+    const client = await db.getClient();
     try {
-        const [rows] = await db.query(
-            'UPDATE reservation SET status = $1 WHERE reserve_id = $2 RETURNING reserve_id',
-            [status, req.params.reserveId]
+        await client.query('BEGIN');
+        const { rows } = await client.query(
+            'UPDATE reservation SET status = $1 WHERE reserve_id = $2 AND restaurant_id = $3 RETURNING reserve_id',
+            [status, req.params.reserveId, req.admin.restaurant_id]
         );
         if (rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Reservation not found.' });
         }
-        res.json({ success: true, message: `Reservation marked as ${status}.` });
+        await syncReservationTable(client, req.params.reserveId, status);
+        await client.query('COMMIT');
+        res.json({ success: true, message: `Reservation marked as ${status.replace('_', '-')}.` });
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error('Error updating reservation status:', error);
         res.status(500).json({ message: 'Failed to update reservation status.' });
+    } finally {
+        client.release();
     }
 });
 

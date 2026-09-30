@@ -5,15 +5,17 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../database');
+const { requireCustomer } = require('../utils/auth');
 
 // ── POST /api/location/update ─────────────────────────────────────────
 // Called by frontend watchPosition handler.
-// Body: { customer_id, latitude, longitude }
-router.post('/update', async (req, res) => {
-    const { customer_id, latitude, longitude } = req.body;
+// Body: { latitude, longitude } — the customer comes from the login token.
+router.post('/update', requireCustomer, async (req, res) => {
+    const { latitude, longitude } = req.body;
+    const customer_id = req.customerId;
 
-    if (!customer_id || latitude == null || longitude == null) {
-        return res.status(400).json({ message: 'customer_id, latitude, and longitude are required.' });
+    if (latitude == null || longitude == null) {
+        return res.status(400).json({ message: 'latitude and longitude are required.' });
     }
 
     // Basic bounds validation

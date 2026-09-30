@@ -17,6 +17,9 @@ const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 const otpStore    = require('../utils/otpStore');
 const { requireAdmin } = require('../utils/auth');
 const { findPeakHours } = require('../utils/kmeans');
+const { smallestFittingTable } = require('../utils/tableAllocation');
+
+const RESTAURANT_TZ = process.env.RESTAURANT_TZ || 'Asia/Kolkata';
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -126,8 +129,11 @@ router.post('/login', async (req, res) => {
 });
 
 // ── GET /api/admin/:id ───────────────────────────────────────────────
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAdmin, async (req, res) => {
     const id = req.params.id;
+    if (String(req.admin.admin_id) !== String(id)) {
+        return res.status(403).json({ message: 'You can only view your own profile.' });
+    }
     try {
         const [rows] = await db.query(
             'SELECT name, email, phone, role, restaurant_id FROM admin WHERE admin_id = $1',
@@ -142,7 +148,7 @@ router.get('/:id', async (req, res) => {
 
 // ── GET /api/admin/reservations/pending/:restaurantId ────────────────
 // Bug A fix: DATE_FORMAT → TO_CHAR (PostgreSQL)
-router.get('/reservations/pending/:restaurantId', async (req, res) => {
+router.get('/reservations/pending/:restaurantId', requireAdmin, async (req, res) => {
     const restaurantId = req.params.restaurantId;
 
     try {
@@ -159,9 +165,12 @@ router.get('/reservations/pending/:restaurantId', async (req, res) => {
             WHERE r.restaurant_id = $1
               AND r.status = 'reserved'
               AND r.table_id IS NULL
+              AND (r.reserve_date + r.reserve_time) >= (NOW() AT TIME ZONE $2) - INTERVAL '2 hours'
             ORDER BY r.reserve_date ASC, r.reserve_time ASC
         `;
-        const [rows] = await db.query(query, [restaurantId]);
+        // Only bookings still ahead of us (2 h grace for late arrivals);
+        // older unassigned ones are shown under All reservations.
+        const [rows] = await db.query(query, [restaurantId, RESTAURANT_TZ]);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching pending reservations:', error);
@@ -170,7 +179,7 @@ router.get('/reservations/pending/:restaurantId', async (req, res) => {
 });
 
 // ── GET /api/admin/reservations/restaurant/:restaurantId ────────────
-router.get('/reservations/restaurant/:restaurantId', async (req, res) => {
+router.get('/reservations/restaurant/:restaurantId', requireAdmin, async (req, res) => {
     try {
         const [rows] = await db.query(`
             SELECT
@@ -181,13 +190,14 @@ router.get('/reservations/restaurant/:restaurantId', async (req, res) => {
                 r.status,
                 TO_CHAR(r.reserve_date, 'FMMonth FMDD, YYYY') AS date,
                 TO_CHAR(r.reserve_time::time, 'HH12:MI AM') AS time,
-                t.table_no
+                t.table_no,
+                (r.reserve_date + r.reserve_time) < (NOW() AT TIME ZONE $2) AS is_past
             FROM reservation r
             JOIN customer c ON r.customer_id = c.customer_id
             LEFT JOIN restaurant_tables t ON r.table_id = t.table_id
             WHERE r.restaurant_id = $1
             ORDER BY r.reserve_date DESC, r.reserve_time DESC
-        `, [req.params.restaurantId]);
+        `, [req.params.restaurantId, RESTAURANT_TZ]);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching restaurant reservations:', error);
@@ -197,7 +207,7 @@ router.get('/reservations/restaurant/:restaurantId', async (req, res) => {
 
 // ── POST /api/admin/reservations/auto-allocate/:restaurantId ────────
 // Assigns the earliest unassigned reservation to the smallest suitable free table.
-router.post('/reservations/auto-allocate/:restaurantId', async (req, res) => {
+router.post('/reservations/auto-allocate/:restaurantId', requireAdmin, async (req, res) => {
     const client = await db.getClient();
     try {
         await client.query('BEGIN');
@@ -208,10 +218,11 @@ router.post('/reservations/auto-allocate/:restaurantId', async (req, res) => {
              WHERE restaurant_id = $1
                AND status = 'reserved'
                AND table_id IS NULL
+               AND (reserve_date + reserve_time) >= (NOW() AT TIME ZONE $2) - INTERVAL '2 hours'
              ORDER BY reserve_date ASC, reserve_time ASC
              LIMIT 1
              FOR UPDATE SKIP LOCKED`,
-            [req.params.restaurantId]
+            [req.params.restaurantId, RESTAURANT_TZ]
         );
 
         if (reservationResult.rows.length === 0) {
@@ -221,25 +232,27 @@ router.post('/reservations/auto-allocate/:restaurantId', async (req, res) => {
         }
 
         const reservation = reservationResult.rows[0];
+        // Lock every free table that fits, then pick with the shared rule
+        // (smallest capacity, then lowest table number — SQL's text sort
+        // would put T10 before T2).
         const tableResult = await client.query(
             `SELECT table_id, table_no, capacity
              FROM restaurant_tables
              WHERE restaurant_id = $1
                AND status = 'vacant'
                AND capacity >= $2
-             ORDER BY capacity ASC, table_no ASC
-             LIMIT 1
              FOR UPDATE SKIP LOCKED`,
             [req.params.restaurantId, reservation.group_size]
         );
+        const bestTable = smallestFittingTable(reservation.group_size, tableResult.rows);
 
-        if (tableResult.rows.length === 0) {
+        if (!bestTable) {
             await client.query('COMMIT');
             client.release();
             return res.json({ allocated: false, message: 'No suitable free table is available for the next reservation.' });
         }
 
-        const table = tableResult.rows[0];
+        const table = bestTable;
         await client.query(
             'UPDATE reservation SET table_id = $1 WHERE reserve_id = $2',
             [table.table_id, reservation.reserve_id]
@@ -262,13 +275,58 @@ router.post('/reservations/auto-allocate/:restaurantId', async (req, res) => {
 
 // ── PUT /api/admin/reservations/:reserveId/allocate ──────────────────
 // Transaction rewritten with proper pg client (getClient) pattern
-router.put('/reservations/:reserveId/allocate', async (req, res) => {
+router.put('/reservations/:reserveId/allocate', requireAdmin, async (req, res) => {
     const reserveId = req.params.reserveId;
     const { table_id } = req.body;
+    const override = req.body.override === true; // only a real boolean overrides the best-fit check
 
     const client = await db.getClient();   // Acquire dedicated connection for transaction
     try {
         await client.query('BEGIN');
+
+        // Seating rule: the table must be free, in the same restaurant and
+        // big enough; and a bigger table shouldn't be used while a smaller
+        // one that fits is free (a pair gets a 2-seater, else a 4, not a 6).
+        // Staff can still override that last check deliberately.
+        // Lock the reservation too, so two staff can't allocate it at once
+        // and leave one table stuck as 'reserved'.
+        const { rows: [reservation] } = await client.query(
+            'SELECT restaurant_id, group_size, status, table_id FROM reservation WHERE reserve_id = $1 FOR UPDATE',
+            [reserveId]
+        );
+        const { rows: [table] } = await client.query(
+            'SELECT table_id, table_no, capacity, status, restaurant_id FROM restaurant_tables WHERE table_id = $1 FOR UPDATE',
+            [table_id]
+        );
+        const reject = async (status, body) => {
+            await client.query('ROLLBACK');
+            client.release();
+            return res.status(status).json(body);
+        };
+        if (!reservation || !table || String(reservation.restaurant_id) !== String(req.admin.restaurant_id)) {
+            return reject(404, { message: 'Reservation or table not found.' });
+        }
+        if (reservation.status !== 'reserved') return reject(409, { message: `This reservation is ${reservation.status.replace('_', '-')}, so it can't be given a table.` });
+        if (reservation.table_id) return reject(409, { message: 'This reservation already has a table.' });
+        if (table.restaurant_id !== reservation.restaurant_id) return reject(400, { message: 'That table belongs to a different restaurant.' });
+        if (table.status !== 'vacant') return reject(409, { message: `Table ${table.table_no} is not free.` });
+        if (table.capacity < reservation.group_size) {
+            return reject(400, { message: `Table ${table.table_no} seats ${table.capacity}; this party has ${reservation.group_size}.` });
+        }
+        if (!override) {
+            const { rows: free } = await client.query(
+                "SELECT table_id, table_no, capacity FROM restaurant_tables WHERE restaurant_id = $1 AND status = 'vacant'",
+                [reservation.restaurant_id]
+            );
+            const bestFit = smallestFittingTable(reservation.group_size, free);
+            if (bestFit && bestFit.capacity < table.capacity) {
+                return reject(409, {
+                    message: `A ${bestFit.capacity}-seat table (${bestFit.table_no}) is free for this party of ${reservation.group_size}.`,
+                    suggested_table: bestFit,
+                    can_override: true
+                });
+            }
+        }
 
         await client.query(
             'UPDATE reservation SET table_id = $1 WHERE reserve_id = $2',
@@ -350,38 +408,22 @@ router.put('/reservations/:reserveId/allocate', async (req, res) => {
 // ── GET /api/admin/customer-summary/:customerId ──────────────────────
 // Plain-language summary of a customer's booking behavior for admin
 // staff — real computed stats (not invented ones) narrated by Gemini.
-// This is the ONE place Gemini is used here: it only phrases numbers
-// that were already computed from the database, it doesn't decide or
-// invent anything about the customer.
+// Gemini only phrases numbers already computed from the database; it
+// doesn't decide or invent anything about the customer.
 //
-// NOTE ON SCOPE: most other admin routes in this file currently have
-// NO JWT verification at all (a pre-existing gap from before this
-// change, not something introduced here) — this new endpoint adds
-// real admin-token verification since it's new code, but it's
-// currently the exception rather than the rule. Worth a dedicated
-// pass to add the same protection everywhere else.
-function getAuthenticatedAdmin(req) {
-    const authorization = req.headers.authorization || '';
-    if (!authorization.startsWith('Bearer ')) return null;
-    try {
-        return jwt.verify(authorization.slice(7), process.env.JWT_SECRET);
-    } catch (error) {
-        return null;
-    }
-}
-
-router.get('/customer-summary/:customerId', async (req, res) => {
-    const admin = getAuthenticatedAdmin(req);
-    if (!admin) {
-        return res.status(401).json({ message: 'Admin login required.' });
-    }
-
+// Privacy: staff only see customers who have booked or queued at THEIR
+// restaurant, and the stats cover that restaurant only.
+router.get('/customer-summary/:customerId', requireAdmin, async (req, res) => {
     const customerId = req.params.customerId;
+    const restaurantId = req.admin.restaurant_id;
 
     try {
         const [customerRows] = await db.query(
-            'SELECT name, email, phone, created_at FROM customer WHERE customer_id = $1',
-            [customerId]
+            `SELECT name, email, phone FROM customer c
+             WHERE c.customer_id = $1
+               AND (EXISTS (SELECT 1 FROM reservation r WHERE r.customer_id = c.customer_id AND r.restaurant_id = $2)
+                 OR EXISTS (SELECT 1 FROM queue q WHERE q.customer_id = c.customer_id AND q.restaurant_id = $2))`,
+            [customerId, restaurantId]
         );
         if (customerRows.length === 0) {
             return res.status(404).json({ message: 'Customer not found.' });
@@ -391,16 +433,16 @@ router.get('/customer-summary/:customerId', async (req, res) => {
         const [reservationStats] = await db.query(`
             SELECT status, COUNT(*) AS count, AVG(group_size) AS avg_party_size
             FROM reservation
-            WHERE customer_id = $1
+            WHERE customer_id = $1 AND restaurant_id = $2
             GROUP BY status
-        `, [customerId]);
+        `, [customerId, restaurantId]);
 
         const [queueStats] = await db.query(`
             SELECT status, COUNT(*) AS count
             FROM queue
-            WHERE customer_id = $1
+            WHERE customer_id = $1 AND restaurant_id = $2
             GROUP BY status
-        `, [customerId]);
+        `, [customerId, restaurantId]);
 
         const totalReservations = reservationStats.reduce((sum, r) => sum + parseInt(r.count, 10), 0);
         const noShowCount = parseInt(reservationStats.find((r) => r.status === 'no_show')?.count || 0, 10);
@@ -419,8 +461,7 @@ router.get('/customer-summary/:customerId', async (req, res) => {
             no_show_rate_percent: noShowRate,
             avg_party_size: avgPartySize,
             queue_joins: queueStats.reduce((sum, q) => sum + parseInt(q.count, 10), 0),
-            queue_left_early: parseInt(queueStats.find((q) => q.status === 'left')?.count || 0, 10),
-            customer_since: customer.created_at
+            queue_left_early: parseInt(queueStats.find((q) => q.status === 'left')?.count || 0, 10)
         };
 
         let summary = null;
@@ -434,7 +475,7 @@ router.get('/customer-summary/:customerId', async (req, res) => {
                 const response = await ai.models.generateContent({
                     model: geminiModel,
                     contents: prompt,
-                    config: { maxOutputTokens: 120, temperature: 0.2 }
+                    config: { maxOutputTokens: 120, temperature: 0.2, thinkingConfig: { thinkingBudget: 0 } } // short narration: no thinking, or it eats the token budget
                 });
                 summary = (response.text || '').trim() || null;
             } catch (summaryError) {
@@ -468,7 +509,7 @@ router.get('/analytics/peak-hours/:restaurantId', requireAdmin, async (req, res)
     const source = ['reservations', 'queue'].includes(req.query.source) ? req.query.source : 'all';
     const k = parseInt(req.query.k, 10) || undefined;
     const days = Math.min(parseInt(req.query.days, 10) || 90, 730);
-    const tz = process.env.RESTAURANT_TZ || 'Asia/Kolkata';
+    const tz = RESTAURANT_TZ;
 
     try {
         const minutes = [];
@@ -500,7 +541,7 @@ router.get('/analytics/peak-hours/:restaurantId', requireAdmin, async (req, res)
         if (minutes.length < 10) {
             return res.json({
                 source, days, samples: minutes.length, hourly, k: 0, clusters: [],
-                message: 'Not enough bookings yet to find meaningful peak hours (need at least 10).'
+                message: 'Busy times appear once there are at least 10 bookings or walk-ins.'
             });
         }
 

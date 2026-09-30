@@ -3,6 +3,7 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../database');
+const { requireAdmin, adminOwnsRow } = require('../utils/auth');
 
 // ── GET /api/tables/restaurant/:id ───────────────────────────────────
 router.get('/restaurant/:id', async (req, res) => {
@@ -20,13 +21,14 @@ router.get('/restaurant/:id', async (req, res) => {
 
 // ── PATCH /api/tables/:tableId/status ────────────────────────────────
 // Updates table status: vacant (Free), occupied, reserved, or unavailable (Cleaning / Under Service)
-router.patch('/:tableId/status', async (req, res) => {
+router.patch('/:tableId/status', requireAdmin, async (req, res) => {
     const { status } = req.body;
     const validStatuses = ['vacant', 'occupied', 'reserved', 'unavailable'];
     if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
     try {
+        if (!(await adminOwnsRow(req, res, 'restaurant_tables', 'table_id', req.params.tableId))) return;
         await db.query(
             'UPDATE restaurant_tables SET status = $1 WHERE table_id = $2',
             [status, req.params.tableId]
