@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Q-Sense Admin | Command Center</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-sans); }
         body.admin-dashboard-page { background-color: #f4f7f9; display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); height: 100vh; overflow: hidden; }
 
     
@@ -28,9 +28,9 @@
         .sidebar-header { padding: 20px; border-bottom: 1px solid #e1e8ed; }
         .sidebar-header h1 { color: #3178c6; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
         
-        .admin-profile { padding: 20px; border-bottom: 1px solid #e1e8ed; background: #f8fbff; }
-        .admin-profile h3 { font-size: 1.1rem; color: #333; word-wrap: break-word;}
-        .admin-profile p { font-size: 0.85rem; color: #666; margin-top: 5px; }
+        .sidebar-profile { padding: 20px; border-bottom: 1px solid #e1e8ed; background: #f8fbff; }
+        .sidebar-profile h3 { font-size: 1.1rem; color: #333; word-wrap: break-word;}
+        .sidebar-profile p { font-size: 0.85rem; color: #666; margin-top: 5px; }
         .badge { display: inline-block; background: #3178c6; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; margin-top: 8px; }
 
         .nav-menu { padding: 15px 0; flex: 1; display: flex; flex-direction: column; align-items: stretch; }
@@ -48,33 +48,51 @@
         .content-section { padding: 30px; display: none; } 
         .content-section.active { display: block; } 
 
-        .card { background: white; padding: 20px; border-radius: 8px; border: 1px solid #e1e8ed; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .reservation-management-list { display: grid; gap: 12px; }
-        .reservation-management-item { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 16px; border: 1px solid #e1e8ed; border-radius: 8px; background: #fbfdff; }
-        .reservation-management-item h3 { margin: 0 0 6px; color: #3178c6; font-size: 1rem; }
-        .reservation-management-item p { margin: 3px 0; color: #667085; font-size: .9rem; }
-        .reservation-status { display: inline-block; margin-top: 6px; padding: 4px 8px; border-radius: 999px; background: #eef5fb; color: #3178c6; font-size: .75rem; font-weight: 700; text-transform: capitalize; }
-        .reservation-management-item a { flex: 0 0 auto; padding: 9px 12px; border-radius: 6px; background: #3178c6; color: #fff; text-decoration: none; font-weight: 600; font-size: .85rem; }
+        .card { background: #fff; padding: 22px 24px 24px; border-radius: 12px; border: 1px solid var(--line); }
+        .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+        .card-head h3 { color: var(--ink); font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
+        .card-head .muted { max-width: 62ch; }
+        .card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .row-list { display: grid; gap: 10px; }
+        .row-card { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfe; }
+        .row-card h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; color: var(--ink); font-size: 1rem; font-weight: 600; }
+        .row-card p { margin: 2px 0; color: #475467; font-size: .9rem; }
+        .row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+        .queue-row.is-called { border-left: 4px solid #d99a00; background: #fffcf2; }
+        .queue-pos { display: inline-grid; place-items: center; min-width: 26px; height: 26px; border-radius: 7px; background: var(--brand-soft); color: var(--brand); font-size: .8rem; font-variant-numeric: tabular-nums; }
+        .wait-time-text { font-variant-numeric: tabular-nums; }
+        .wait-time-text.is-long { color: #b42318 !important; font-weight: 600; }
+        .status-chip { display: inline-block; padding: 3px 9px; border-radius: 6px; background: #eef2f6; color: #475467; font-size: .75rem; font-weight: 600; text-transform: capitalize; }
+        .status-reserved, .status-seated { background: var(--brand-soft); color: var(--brand); }
+        .status-completed { background: #ecfdf3; color: #067647; }
+        .status-cancelled, .status-no_show { background: #fef3f2; color: #b42318; }
+        .status-called { background: #fff4d6; color: #8a5a00; }
+        .status-past { background: #f2f4f7; color: #667085; }
+        .empty-state { padding: 28px 20px; border: 1px dashed #cfd8e3; border-radius: 10px; text-align: center; color: #475467; }
+        .empty-state strong { display: block; color: var(--ink); margin-bottom: 4px; }
+        .error-text { color: #b42318; }
+        .select { padding: 8px 10px; border: 1px solid #cfd8e3; border-radius: 8px; font: inherit; font-size: .9rem; background: #fff; }
+        .live-dot { display: inline-flex; align-items: center; gap: 6px; color: #475467; font-size: .85rem; font-weight: 500; }
+        .live-dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #12b76a; box-shadow: 0 0 0 3px #d1fadf; }
+        button.nav-item { width: 100%; border: 0; background: none; font: inherit; text-align: left; }
 
-
-        /* AI tools (optimizer + analytics) */
-        .ai-btn { background: #3178c6; color: #fff; border: 1px solid #3178c6; padding: 7px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: .9rem; }
-        .ai-btn.secondary { background: #fff; color: #3178c6; }
-        .ai-select { padding: 7px 8px; border: 1px solid #ccc; border-radius: 6px; font: inherit; font-size: .9rem; }
         .muted { color: #667085; font-size: .85rem; }
-        .table-scroll { overflow-x: auto; }
-        .ai-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
-        .ai-table th { text-align: left; color: #555; font-weight: 600; padding: 10px; border-bottom: 2px solid #e1e8ed; white-space: nowrap; }
-        .ai-table td { padding: 10px; border-bottom: 1px solid #eef3f8; vertical-align: top; }
-        .ai-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-        .ai-table tr.best td { background: #f3f9f4; }
-        .pill { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: #28a745; color: #fff; font-size: .7rem; font-weight: 700; }
         .hour-chart { display: flex; align-items: flex-end; gap: 3px; height: 160px; padding: 0 2px 20px; border-bottom: 1px solid #e1e8ed; }
         .bar-col { position: relative; flex: 1; height: 100%; display: flex; align-items: flex-end; }
         .bar { width: 100%; min-height: 2px; background: #d6e4f3; border-radius: 3px 3px 0 0; }
         .bar.peak { background: #3178c6; }
         .bar.busy { background: #7fa9d9; }
         .bar-label { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: .7rem; color: #888; }
+        .seating-plan { margin-bottom: 20px; padding: 16px; border: 1px solid #b8d4f2; border-radius: 8px; background: #f8fbff; }
+        .plan-summary { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+        .plan-summary span { color: #667085; font-size: .88rem; }
+        .plan-list { list-style: none; margin: 0 0 10px; padding: 0; }
+        .plan-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #e7edf3; font-size: .92rem; }
+        .plan-table { font-weight: 600; color: #3178c6; white-space: nowrap; }
+        .plan-table small { color: #667085; font-weight: 500; }
+        .plan-waiting { color: #8a5a00; font-size: .88rem; margin-bottom: 10px; }
+        .plan-actions { display: flex; gap: 8px; }
+        .staff-tip { margin-top: 16px; padding: 10px 12px; border-radius: 8px; background: #eef5fb; color: #243447; font-size: .92rem; }
         .peak-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
         .peak-card { padding: 14px; border: 1px solid #e1e8ed; border-left: 5px solid #d6e4f3; border-radius: 8px; background: #fbfdff; }
         .peak-card.peak { border-left-color: #3178c6; }
@@ -83,8 +101,18 @@
         .peak-time { font-size: 1.25rem; font-weight: 700; color: #1a1a1a; margin: 4px 0; font-variant-numeric: tabular-nums; }
 
         @media (max-width: 800px) {
+            body.admin-dashboard-page { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); height: auto; min-height: 100dvh; overflow: visible; }
             .top-nav { flex-wrap: wrap; gap: 12px; padding: 12px 18px; }
             .top-nav .nav-links { order: 3; width: 100%; justify-content: center; gap: 14px; overflow-x: auto; }
+            .sidebar { grid-column: 1; grid-row: 2; border-right: 0; border-bottom: 1px solid var(--line); }
+            .sidebar-profile, .logout-btn { display: none; }
+            .nav-menu { flex-direction: row; overflow-x: auto; padding: 0; }
+            button.nav-item { width: auto; white-space: nowrap; border-right: 0 !important; border-bottom: 3px solid transparent; }
+            button.nav-item.active { border-bottom-color: var(--brand); }
+            .main-content { grid-column: 1; grid-row: 3; }
+            .content-section { padding: 16px; }
+            .row-card { flex-direction: column; align-items: flex-start; }
+            .row-actions { justify-content: flex-start; }
         }
     </style>
     <link rel="stylesheet" href="style.css">
@@ -93,551 +121,448 @@
 
     <header class="top-nav">
         <a href="index.html" class="brand">🍴 Q-Sense</a>
-        <nav class="nav-links">
+        <nav class="nav-links" aria-label="Sections">
             <a href="#table-management" class="active" onclick="switchTabFromTop(event, 'table-management', this)">Overview</a>
-            <a href="AdminTableManagement.html">Tables</a>
+            <a href="AdminTableManagement.html">Floor plan</a>
             <a href="#reservations" onclick="switchTabFromTop(event, 'reservations', this)">Reservations</a>
             <a href="#live-queue" onclick="switchTabFromTop(event, 'live-queue', this)">Queue</a>
         </nav>
         <div class="profile-menu">
-            <button id="profileToggle" class="profile-toggle" type="button" aria-expanded="false">
+            <button id="profileToggle" class="profile-toggle" type="button" aria-expanded="false" aria-haspopup="true">
                 <span id="navUserInitial">A</span>
                 <span id="navUserName">Admin</span>
-                <span class="caret">▾</span>
+                <span class="caret" aria-hidden="true">▾</span>
             </button>
             <div id="profileDropdown" class="profile-dropdown hidden">
-                <a href="AdminDashboard.html">Profile</a>
-                <a href="AdminTableManagement.html">Table Overview</a>
-                <a href="#" id="logoutAdmin">Logout</a>
+                <a href="AdminDashboard.html">Dashboard</a>
+                <a href="AdminTableManagement.html">Floor plan</a>
+                <a href="#" id="logoutAdmin">Log out</a>
             </div>
         </div>
     </header>
 
     <aside class="sidebar">
-        
-        <div class="admin-profile">
-            <h3 id="admin-name">Loading...</h3>
-            <p id="admin-restaurant">Restaurant: Loading...</p>
-            <span class="badge" id="admin-role-badge">Store Manager</span>
+        <div class="sidebar-profile">
+            <h3 id="admin-name">Loading…</h3>
+            <p id="admin-restaurant">Loading restaurant…</p>
+            <span class="badge" id="admin-role-badge">Manager</span>
         </div>
 
-        <nav class="nav-menu">
-            <div class="nav-item active" data-tab="table-management" onclick="switchTab('table-management', this)">
-                📊 Table Management
-            </div>
-            <div class="nav-item" data-tab="reservations" onclick="switchTab('reservations', this)">
-                📅 Reservations
-            </div>
-            <div class="nav-item" data-tab="live-queue" onclick="switchTab('live-queue', this)">
-                🚶 Live Queue
-            </div>
-            <div class="nav-item" data-tab="optimizer" onclick="switchTab('optimizer', this)">
-                🧩 Optimizer
-            </div>
-            <div class="nav-item" data-tab="analytics" onclick="switchTab('analytics', this)">
-                📈 Peak Hours
-            </div>
+        <nav class="nav-menu" aria-label="Dashboard">
+            <button type="button" class="nav-item active" data-tab="table-management" data-title="Today's bookings" onclick="switchTab('table-management', this)">Today's bookings</button>
+            <button type="button" class="nav-item" data-tab="live-queue" data-title="Walk-in queue" onclick="switchTab('live-queue', this)">Walk-in queue</button>
+            <button type="button" class="nav-item" data-tab="reservations" data-title="All reservations" onclick="switchTab('reservations', this)">All reservations</button>
+            <button type="button" class="nav-item" data-tab="analytics" data-title="Busy times" onclick="switchTab('analytics', this)">Busy times</button>
         </nav>
 
-        <button class="logout-btn" onclick="logout()">Logout</button>
+        <button class="logout-btn" onclick="logout()">Log out</button>
     </aside>
 
-    <main class="main-content">
+    <main class="main-content" id="main">
         <header class="topbar">
-            <h2 id="page-title">Table Management</h2>
-            <div style="color: #666; font-size: 0.9rem;">Live System Status: <span style="color: #28a745; font-weight: bold;">Online</span></div>
+            <h2 id="page-title">Today's bookings</h2>
+            <span class="live-dot">Live</span>
         </header>
 
         <section id="table-management" class="content-section active">
             <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="color: #3178c6; margin: 0;">Pending Reservations</h3>
-                    <div style="display: flex; gap: 8px;">
-                        <button onclick="aiAllocateReservation()" style="background: #3178c6; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 600;">🤖 AI Allocate</button>
-                        <button onclick="window.location.href='AdminTableManagement.html'" 
-                                style="background: #fff; border: 2px solid #3178c6; color: #3178c6; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s;"
-                                onmouseover="this.style.background='#3178c6'; this.style.color='#fff';"
-                                onmouseout="this.style.background='#fff'; this.style.color='#3178c6';">
-                            🗺️ View Floor Plan
-                        </button>
+                <div class="card-head">
+                    <div>
+                        <h3>Bookings without a table</h3>
+                        <p class="muted">Each booking gets the smallest free table that fits the party.</p>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" onclick="assignNextReservation()">Assign next booking</button>
+                        <a class="btn btn-secondary" href="AdminTableManagement.html">Floor plan</a>
                     </div>
                 </div>
-                
-                <p style="color: #666; margin-bottom: 20px;">Assign incoming reservations to available tables.</p>
-                <div id="pending-reservations-list"></div>
-            </div>
-        </section>
-
-        <section id="reservations" class="content-section">
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="color: #3178c6; margin: 0;">Reservation Management</h3>
-                    <div style="display: flex; gap: 8px;">
-                        <button onclick="aiAllocateReservation()" style="background: #3178c6; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">🤖 AI Allocate Next</button>
-                        <button onclick="loadRestaurantReservations(localStorage.getItem('restaurant_id'))" style="background: #fff; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer;">🔄 Refresh</button>
-                    </div>
-                </div>
-                <p style="color: #666; margin-bottom: 20px;">Review bookings, statuses, and assigned table numbers.</p>
-                <div id="restaurant-reservations-list" class="reservation-management-list"></div>
+                <div id="pending-reservations-list" class="row-list"></div>
             </div>
         </section>
 
         <section id="live-queue" class="content-section">
             <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="color: #3178c6; margin: 0;">Live Walk-in Queue</h3>
-                    <div style="display: flex; gap: 8px;">
-                        <button onclick="smartAllocateTable()" style="background: #3178c6; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">🤖 Allocate Ready Guests</button>
-                        <button onclick="loadLiveQueue(localStorage.getItem('restaurant_id'))" style="background: #fff; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer;">🔄 Refresh</button>
+                <div class="card-head">
+                    <div>
+                        <h3>Walk-in queue</h3>
+                        <p class="muted">Guests who have waited a minute are seated automatically at the best-fitting free table. Use <em>Plan seating</em> to review and seat everyone at once.</p>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" onclick="planSeating()">Plan seating</button>
+                        <button class="btn btn-secondary" onclick="loadLiveQueue()">Refresh</button>
                     </div>
                 </div>
-                <p style="color: #666; margin-bottom: 20px;">Manage customers currently waiting for a table.</p>
-                
-                <div id="live-queue-list"></div>
+                <div id="seating-plan" class="seating-plan" hidden></div>
+                <div id="live-queue-list" class="row-list"><p class="muted">Loading queue…</p></div>
             </div>
         </section>
 
-        <section id="optimizer" class="content-section">
+        <section id="reservations" class="content-section">
             <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
-                    <h3 style="color: #3178c6; margin: 0;">Table Allocation Optimizer</h3>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="ai-btn" onclick="runOptimizer('live')">Compare on live queue</button>
-                        <button class="ai-btn secondary" onclick="runOptimizer('demo')">Run demo instance</button>
+                <div class="card-head">
+                    <div>
+                        <h3>All reservations</h3>
+                        <p class="muted">Every booking with its status and table. Mark guests who don't turn up as a no-show to free their table.</p>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-secondary" onclick="loadRestaurantReservations()">Refresh</button>
                     </div>
                 </div>
-                <p style="color: #666; margin-bottom: 16px;">Seats every waiting party at once. Each run is scored the same way: wasted seats, plus 10 points per guest left unseated, plus 0.5 per minute that guest has already waited. Lower is better. The demo instance is one where hill climbing gets stuck.</p>
-                <div id="optimizer-results"></div>
+                <div id="restaurant-reservations-list" class="row-list"></div>
             </div>
         </section>
 
         <section id="analytics" class="content-section">
             <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
-                    <h3 style="color: #3178c6; margin: 0;">Peak Hours</h3>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <select id="peak-source" class="ai-select" onchange="loadPeakHours()">
-                            <option value="all">Reservations + walk-ins</option>
-                            <option value="reservations">Reservations only</option>
+                <div class="card-head">
+                    <div>
+                        <h3>Busy times</h3>
+                        <p class="muted">When your guests arrive, so you can plan staff and prep around the rush.</p>
+                    </div>
+                    <div class="card-actions">
+                        <select id="peak-source" class="select" onchange="loadPeakHours()" aria-label="Which guests to include">
+                            <option value="all">Bookings and walk-ins</option>
+                            <option value="reservations">Bookings only</option>
                             <option value="queue">Walk-ins only</option>
                         </select>
-                        <button class="ai-btn secondary" onclick="loadPeakHours()">Refresh</button>
                     </div>
                 </div>
-                <p style="color: #666; margin-bottom: 16px;">Groups the last 90 days of bookings and walk-ins by time of day using K-means clustering. The number of groups is picked automatically, and the largest group is your peak.</p>
                 <div id="peak-hours"></div>
-            </div>
-        </section>
-
-        <section id="contact" class="content-section">
-            <div class="card">
-                <h3 style="color: #3178c6; margin-bottom: 15px;">IT Support & Contact</h3>
-                <p style="color: #666;">Need help? Contact the Q-Sense SuperAdmin team at support@qsense.com</p>
             </div>
         </section>
     </main>
 
+    <script src="js/api.js"></script>
     <script>
-       
+        const restaurantId = localStorage.getItem('restaurant_id');
+        const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
         function switchTab(tabId, element) {
-            document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.remove('active'));
             element.classList.add('active');
-            
-            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            document.querySelectorAll('.content-section').forEach((section) => section.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
-
             if (tabId === 'analytics' && !document.querySelector('#peak-hours > *')) loadPeakHours();
-
-            document.getElementById('page-title').innerText = element.innerText.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+            document.getElementById('page-title').textContent = element.dataset.title || element.textContent.trim();
         }
 
         function switchTabFromTop(event, tabId, link) {
             event.preventDefault();
             const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
             if (navItem) switchTab(tabId, navItem);
-            document.querySelectorAll('.top-nav .nav-links a').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.top-nav .nav-links a').forEach((item) => item.classList.remove('active'));
             link.classList.add('active');
         }
 
         function logout() {
-            localStorage.clear();
-            window.location.href = "AdminLogin.html"; 
+            clearSession();
+            window.location.href = 'AdminLogin.html';
         }
 
         const profileToggle = document.getElementById('profileToggle');
         const profileDropdown = document.getElementById('profileDropdown');
-        const logoutAdminLink = document.getElementById('logoutAdmin');
 
         function populateProfileMenu() {
             const name = localStorage.getItem('admin_email') || 'Admin';
-            const firstLetter = name.trim().charAt(0).toUpperCase() || 'A';
-            document.getElementById('navUserInitial').textContent = firstLetter;
+            document.getElementById('navUserInitial').textContent = name.trim().charAt(0).toUpperCase() || 'A';
             document.getElementById('navUserName').textContent = name.split('@')[0] || 'Admin';
         }
 
         profileToggle.addEventListener('click', () => {
             profileDropdown.classList.toggle('hidden');
-            profileToggle.setAttribute('aria-expanded', profileDropdown.classList.contains('hidden') ? 'false' : 'true');
+            profileToggle.setAttribute('aria-expanded', String(!profileDropdown.classList.contains('hidden')));
         });
-
         document.addEventListener('click', (event) => {
             if (!event.target.closest('.profile-menu')) {
                 profileDropdown.classList.add('hidden');
                 profileToggle.setAttribute('aria-expanded', 'false');
             }
         });
-
-        logoutAdminLink.addEventListener('click', (event) => {
+        document.getElementById('logoutAdmin').addEventListener('click', (event) => {
             event.preventDefault();
             logout();
         });
-
         populateProfileMenu();
 
-        window.addEventListener("DOMContentLoaded", async () => {
-            const adminId = localStorage.getItem("admin_id");
-            const restaurantId = localStorage.getItem("restaurant_id");
-            const adminEmail = localStorage.getItem("admin_email");
-            const adminRole = localStorage.getItem("role") || "Store Manager";
+        window.addEventListener('DOMContentLoaded', async () => {
+            const adminEmail = localStorage.getItem('admin_email');
+            const adminRole = localStorage.getItem('role') || 'manager';
 
-            if (!adminId || !restaurantId || restaurantId === "undefined") {
-                localStorage.clear();
-                window.location.href = "AdminLogin.html";
+            if (!localStorage.getItem('admin_id') || !restaurantId || restaurantId === 'undefined' || !localStorage.getItem('auth_token')) {
+                logout();
                 return;
             }
 
-            document.getElementById("admin-name").textContent = adminEmail;
-            document.getElementById("admin-restaurant").textContent = `Restaurant ID: ${restaurantId} · Loading restaurant...`;
-            document.getElementById("admin-role-badge").textContent = adminRole.charAt(0).toUpperCase() + adminRole.slice(1);
+            document.getElementById('admin-name').textContent = adminEmail || 'Admin';
+            document.getElementById('admin-restaurant').textContent = 'Loading restaurant…';
+            document.getElementById('admin-role-badge').textContent = adminRole.charAt(0).toUpperCase() + adminRole.slice(1);
 
             try {
-                const restaurantRes = await fetch(`http://localhost:5000/api/restaurant/${restaurantId}`);
-                if (restaurantRes.ok) {
-                    const restaurant = await restaurantRes.json();
-                    document.getElementById("admin-restaurant").textContent = `Restaurant ID: ${restaurantId} · ${restaurant.name}`;
-                }
+                const restaurant = await apiFetch(`/restaurant/${restaurantId}`);
+                document.getElementById('admin-restaurant').textContent = restaurant.name;
             } catch (error) {
-                console.error("Restaurant lookup error:", error);
+                document.getElementById('admin-restaurant').textContent = `Restaurant #${restaurantId}`;
             }
 
-            await loadPendingReservations(restaurantId);
-            await loadRestaurantReservations(restaurantId);
-            await loadLiveQueue(restaurantId);
+            await Promise.all([loadPendingReservations(), loadRestaurantReservations(), loadLiveQueue()]);
         });
 
+        const emptyState = (title, body) => `<div class="empty-state"><strong>${title}</strong><p>${body}</p></div>`;
+        const errorState = (message) => `<p class="error-text">${escapeHtml(message)}</p>`;
 
-        async function loadPendingReservations(restaurantId) {
-            const listContainer = document.getElementById("pending-reservations-list");
-            listContainer.innerHTML = "<p style='color: #666;'>Loading requests...</p>";
-
+        // ── Reservations ─────────────────────────────────────────────────
+        async function loadPendingReservations() {
+            const list = document.getElementById('pending-reservations-list');
+            list.innerHTML = '<p class="muted">Loading bookings…</p>';
             try {
-                const res = await fetch(`http://localhost:5000/api/admin/reservations/pending/${restaurantId}`);
-                const reservations = await res.json();
-
-                if (!res.ok) {
-                    listContainer.innerHTML = `<p style='color: #d9534f; font-weight: bold;'>Backend Error: ${reservations.message || "Check your Node terminal!"}</p>`;
-                    return;
-                }
-
-                if (!Array.isArray(reservations) || reservations.length === 0) {
-                    listContainer.innerHTML = `
-                        <div style="padding: 40px 20px; background: #eef5fb; border-radius: 8px; text-align: center; border: 1px dashed #b8d4f2;">
-                            <h3 style="color: #3178c6; margin-bottom: 10px;">🎉 All caught up!</h3>
-                            <p style="color: #666; margin-bottom: 20px;">There are no unassigned reservations waiting for a table.</p>
-                            <button onclick="window.location.href='AdminTableManagement.html'" 
-                                    style="background: #3178c6; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 6px rgba(49,120,198,0.2);">
-                                Go to Table Management ➡
-                            </button>
-                        </div>`;
-                    return;
-                }
-
-                listContainer.innerHTML = ""; 
-
-                reservations.forEach(req => {
-                    const card = document.createElement("div");
-                    card.style.cssText = "border: 1px solid #e1e8ed; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; background: #fafcff;";
-                    
-                    card.innerHTML = `
-                        <div>
-                            <h4 style="color: #3178c6; margin-bottom: 5px; font-size: 1.1rem;">👤 ${req.customer_name}</h4>
-                            <p style="font-size: 0.9rem; color: #555;">📞 ${req.phone} &nbsp;|&nbsp; 👥 <strong>${req.group_size} Guests</strong></p>
-                            <p style="font-size: 0.9rem; color: #555; margin-top: 5px;">📅 ${req.date} &nbsp;|&nbsp; ⏰ ${req.time}</p>
-                        </div>
-                        
-                        <div>
-                            <button onclick="window.location.href='AdminTableManagement.html?reserve_id=${req.reserve_id}&party_size=${req.group_size}'" 
-                                    style="background: #3178c6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;">
-                                ⚙️ Manage
-                            </button>
-                        </div>
-                    `;
-                    listContainer.appendChild(card);
-                });
-
-            } catch (error) {
-                console.error("Error fetching reservations:", error);
-                listContainer.innerHTML = "<p style='color: #d9534f; font-weight: bold;'>Failed to load reservations. Check console.</p>";
-            }
-        }
-
-        async function loadRestaurantReservations(restaurantId) {
-            const list = document.getElementById('restaurant-reservations-list');
-            if (!list) return;
-            list.innerHTML = '<p style="color: #666;">Loading reservations...</p>';
-            try {
-                const res = await fetch(`http://localhost:5000/api/admin/reservations/restaurant/${restaurantId}`);
-                const reservations = await res.json();
-                if (!res.ok || !Array.isArray(reservations)) throw new Error(reservations.message || 'Failed to load reservations.');
+                const reservations = await adminFetch(`/admin/reservations/pending/${restaurantId}`);
                 if (!reservations.length) {
-                    list.innerHTML = '<div class="empty-state">No reservations found for this restaurant.</div>';
+                    list.innerHTML = emptyState('No bookings waiting for a table', 'New reservations appear here until a table is assigned.');
                     return;
                 }
-                list.innerHTML = '';
-                reservations.forEach((reservation) => {
-                    const item = document.createElement('article');
-                    item.className = 'reservation-management-item';
-                    const tableText = reservation.table_no ? `Table ${reservation.table_no}` : 'Table not assigned';
-                    const action = reservation.table_no ? '' : `<a href="AdminTableManagement.html?reserve_id=${reservation.reserve_id}&party_size=${reservation.group_size}">Allocate Table</a>`;
-                    item.innerHTML = `<div><h3>${reservation.customer_name}</h3><p>${reservation.date} at ${reservation.time} · Party of ${reservation.group_size}</p><p>${tableText}</p><span class="reservation-status">${reservation.status}</span></div>${action}`;
-                    list.appendChild(item);
-                });
-            } catch (error) {
-                console.error('Reservation management error:', error);
-                list.innerHTML = `<p style="color: #d9534f;">${error.message}</p>`;
-            }
-        }
-
-        async function aiAllocateReservation() {
-            const restaurantId = localStorage.getItem('restaurant_id');
-            try {
-                const res = await fetch(`http://localhost:5000/api/admin/reservations/auto-allocate/${restaurantId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'AI allocation failed.');
-                if (data.allocated) {
-                    alert(`Reservation allocated to table ${data.table_no}.`);
-                    await loadRestaurantReservations(restaurantId);
-                } else {
-                    alert(data.message);
-                }
-            } catch (error) {
-                console.error('AI reservation allocation error:', error);
-                alert(error.message);
-            }
-        }
-
-  
-        async function loadLiveQueue(restaurantId) {
-            const listContainer = document.getElementById("live-queue-list");
-            listContainer.innerHTML = "<p style='color: #666;'>Loading queue...</p>";
-
-            try {
-                const res = await fetch(`http://localhost:5000/api/queue/admin/${restaurantId}`);
-                const queue = await res.json();
-
-                if (!Array.isArray(queue) || queue.length === 0) {
-                    listContainer.innerHTML = `
-                        <div style="padding: 30px 20px; background: #f9fafb; border-radius: 8px; text-align: center; border: 1px dashed #ccc;">
-                            <p style="color: #666; font-weight: 500;">No one is currently in the walk-in queue.</p>
-                        </div>`;
-                    return;
-                }
-
-                listContainer.innerHTML = ""; 
-
-                queue.forEach((req, index) => {
-                    const joinTime = new Date(req.joined_at);
-                    const waitMinutes = Math.floor((new Date() - joinTime) / 60000);
-                    
-                    const isCalled = req.status === 'called';
-                    const highlightBorder = isCalled ? "border-left: 5px solid #ffc107;" : "border-left: 5px solid #3178c6;";
-
-                    const card = document.createElement("div");
-                    card.style.cssText = `border: 1px solid #e1e8ed; ${highlightBorder} padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; background: ${isCalled ? '#fffdf5' : '#fff'}; box-shadow: 0 2px 4px rgba(0,0,0,0.02);`;
-                    
-                    /* FIX 2: Fixed the broken template literal structure here */
-                    card.innerHTML = `
+                list.innerHTML = reservations.map((r) => `
+                    <article class="row-card">
                         <div>
-                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
-                                <span style="background: #eef5fb; color: #3178c6; font-weight: bold; padding: 3px 8px; border-radius: 4px; font-size: 0.9rem;">#${index + 1}</span>
-                                <h4 style="color: #333; margin: 0; font-size: 1.1rem;">👤 ${req.customer_name}</h4>
-                                ${isCalled ? '<span style="background: #ffc107; color: #000; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: bold;">CALLED</span>' : ''}
-                            </div>
-                            <p style="font-size: 0.9rem; color: #555;">📞 ${req.phone} &nbsp;|&nbsp; 👥 <strong>${req.group_size} Guests</strong></p>
-                            <p class="wait-time-text" style="font-size: 0.85rem; color: ${waitMinutes > 20 ? '#d9534f' : '#666'}; margin-top: 5px; font-weight: 500;">
-                                ⏱️ Waiting for <span class="live-timer" data-joined="${req.joined_at}">${waitMinutes}</span> mins
-                            </p>
+                            <h4>${escapeHtml(r.customer_name)}</h4>
+                            <p>${escapeHtml(r.date)} at ${escapeHtml(r.time)} · party of ${r.group_size}</p>
+                            <p class="muted">${escapeHtml(r.phone || 'No phone')}</p>
                         </div>
-                        
-                        <div style="display: flex; gap: 8px;">
-                            ${!isCalled ? 
-                                `<button onclick="updateQueueStatus(${req.queue_id}, 'called')" style="background: #f0ad4e; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">🔔 Call</button>` 
-                                : ''}
-                            <button onclick="updateQueueStatus(${req.queue_id}, 'seated')" style="background: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">✅ Seated</button>
-                            <button onclick="updateQueueStatus(${req.queue_id}, 'cancelled')" style="background: #d9534f; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">❌ Cancel</button>
-                        </div>
-                    `;
-                    listContainer.appendChild(card);
-                });
-
+                        <a class="btn btn-primary" href="AdminTableManagement.html?reserve_id=${r.reserve_id}&party_size=${r.group_size}">Choose table</a>
+                    </article>`).join('');
             } catch (error) {
-                console.error("Error loading queue:", error);
-                listContainer.innerHTML = "<p style='color: #d9534f;'>Failed to load queue.</p>";
+                list.innerHTML = errorState(error.message);
             }
         }
 
-        async function updateQueueStatus(queueId, newStatus) {
+        async function loadRestaurantReservations() {
+            const list = document.getElementById('restaurant-reservations-list');
+            list.innerHTML = '<p class="muted">Loading reservations…</p>';
             try {
-                const res = await fetch(`http://localhost:5000/api/queue/update/${queueId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
-                });
-
-                if (res.ok) {
-                    loadLiveQueue(localStorage.getItem('restaurant_id'));
-                } else {
-                    alert("Failed to update status.");
+                const reservations = await adminFetch(`/admin/reservations/restaurant/${restaurantId}`);
+                if (!reservations.length) {
+                    list.innerHTML = emptyState('No reservations yet', 'Bookings made on the website or through the chat assistant will show up here.');
+                    return;
                 }
+                list.innerHTML = reservations.map((r) => `
+                    <article class="row-card">
+                        <div>
+                            <h4>${escapeHtml(r.customer_name)}</h4>
+                            <p>${escapeHtml(r.date)} at ${escapeHtml(r.time)} · party of ${r.group_size}</p>
+                            <p class="muted">${r.table_no ? `Table ${escapeHtml(r.table_no)}` : 'No table yet'}</p>
+                        </div>
+                        <div class="row-actions">
+                            ${r.status === 'reserved' && r.is_past ? '<span class="status-chip status-past">past</span>' : ''}
+                            <span class="status-chip status-${escapeHtml(r.status)}">${escapeHtml(r.status.replace('_', '-'))}</span>
+                            ${reservationActions(r)}
+                        </div>
+                    </article>`).join('');
             } catch (error) {
-                console.error("Error updating status:", error);
+                list.innerHTML = errorState(error.message);
             }
         }
 
-        async function smartAllocateTable(showMessage = true) {
-            const restaurantId = localStorage.getItem('restaurant_id');
+        // Next unassigned booking → smallest free table that fits it.
+        async function assignNextReservation() {
             try {
-                const res = await fetch(`http://localhost:5000/api/queue/auto-allocate/${restaurantId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'Auto-allocation failed.');
+                const data = await adminFetch(`/admin/reservations/auto-allocate/${restaurantId}`, { method: 'POST' });
                 if (data.allocated) {
-                    if (showMessage) {
-                        const seated = data.assignments || [{ table_no: data.table_no }];
-                        alert(seated.length === 1
-                            ? `Guest allocated to table ${seated[0].table_no}.`
-                            : `Seated ${seated.length} parties in one batch (CSP): tables ${seated.map((a) => a.table_no).join(', ')}.`);
-                    }
-                    await loadLiveQueue(restaurantId);
-                } else if (showMessage) {
-                    alert(data.message);
+                    toast(`Booking assigned to table ${data.table_no}.`, 'success');
+                    await Promise.all([loadPendingReservations(), loadRestaurantReservations()]);
+                } else {
+                    toast(data.message);
                 }
             } catch (error) {
-                console.error('Smart allocation error:', error);
-                if (showMessage) alert(error.message);
+                toast(error.message, 'error');
             }
         }
 
-     
-        setInterval(() => {
-            document.querySelectorAll('.live-timer').forEach(span => {
-                const joinTime = new Date(span.getAttribute('data-joined'));
-                const waitMinutes = Math.floor((new Date() - joinTime) / 60000);
-                
-                span.textContent = waitMinutes;
-                
-                if (waitMinutes > 20) {
-                    span.closest('.wait-time-text').style.color = '#d9534f';
-                }
-            });
-        }, 30000); 
-
-        setInterval(() => smartAllocateTable(false), 30000);
-
-        // ── AI tools: allocation optimizer + peak-hour analytics ──────────
-        const API_ROOT = 'http://localhost:5000/api';
-        const adminHeaders = () => ({
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
-        });
-        const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-
-        const SOLVER_LABELS = {
-            baseline: ['Old rule (greedy FIFO)', 'Oldest party takes the smallest table that fits'],
-            csp: ['CSP backtracking', 'MRV + LCV + forward checking + branch & bound (optimal)'],
-            hill_climbing: ['Hill climbing', 'Local moves and swaps, starting from the old rule'],
-            genetic: ['Genetic algorithm', 'Selection, crossover, mutation (seeded)']
-        };
-
-        function solverDetail(key, r) {
-            const s = r.stats || {};
-            if (key === 'csp') return `${s.nodes_explored} nodes explored, ${s.branches_pruned} pruned${s.optimal ? ', proven optimal' : ', node limit hit'}`;
-            if (key === 'hill_climbing') return `${s.steps} improving step(s), then stopped: ${String(s.stopped_because).replace('_', ' ')}`;
-            if (key === 'genetic') {
-                const h = s.best_cost_by_generation || [];
-                const firstBest = h.indexOf(h[h.length - 1]);
-                return `best found by generation ${firstBest} of ${s.generations}`;
+        // What staff can do next with a booking. Seating occupies its table;
+        // completed / no-show free it again.
+        function reservationActions(r) {
+            const choose = `<a class="btn btn-secondary" href="AdminTableManagement.html?reserve_id=${r.reserve_id}&party_size=${r.group_size}">Choose table</a>`;
+            const act = (status, label, cls = 'btn-ghost') => `<button class="btn ${cls}" onclick="setReservationStatus(${r.reserve_id}, '${status}')">${label}</button>`;
+            if (r.status === 'reserved') {
+                return [
+                    !r.table_no && !r.is_past ? choose : '',
+                    r.table_no ? act('seated', 'Arrived', 'btn-secondary') : '',
+                    r.is_past ? act('completed', 'Completed') : '',
+                    act('no_show', 'No-show')
+                ].join('');
             }
+            if (r.status === 'seated') return act('completed', 'Completed', 'btn-secondary');
             return '';
         }
 
-        async function runOptimizer(mode) {
-            const box = document.getElementById('optimizer-results');
-            box.innerHTML = '<p style="color:#666;">Running solvers…</p>';
-            const restaurantId = localStorage.getItem('restaurant_id');
-            try {
-                const res = await fetch(mode === 'demo' ? `${API_ROOT}/queue/optimize/demo` : `${API_ROOT}/queue/optimize/${restaurantId}`, {
-                    method: 'POST', headers: adminHeaders(), body: JSON.stringify({ algorithm: 'compare' })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'Optimizer failed.');
+        const STATUS_TOAST = {
+            seated: 'Guests seated. Their table is now occupied.',
+            completed: 'Marked completed. The table is free again.',
+            no_show: 'Marked as a no-show. The table is free again.'
+        };
 
-                const results = data.results;
-                if (mode === 'live' && data.parties === 0) {
-                    box.innerHTML = '<p style="color:#666;">No parties are waiting right now, so there is nothing to optimise. Try the demo instance.</p>';
+        async function setReservationStatus(reserveId, status) {
+            try {
+                await adminFetch(`/reservations/${reserveId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+                toast(STATUS_TOAST[status] || 'Reservation updated.', 'success');
+                await Promise.all([loadPendingReservations(), loadRestaurantReservations()]);
+            } catch (error) {
+                toast(error.message, 'error');
+            }
+        }
+
+        // ── Live queue ───────────────────────────────────────────────────
+        async function loadLiveQueue() {
+            const list = document.getElementById('live-queue-list');
+            try {
+                const queue = await adminFetch(`/queue/admin/${restaurantId}`);
+                if (!queue.length) {
+                    list.innerHTML = emptyState('Nobody is waiting', 'Walk-ins who join the waitlist from their phone appear here.');
                     return;
                 }
-                const best = Math.min(...Object.values(results).map((r) => r.cost));
-                const rows = Object.entries(results).map(([key, r]) => {
-                    const [name, how] = SOLVER_LABELS[key];
-                    const seats = r.seated.map((s) => `${escapeHtml(s.party_id)}→${escapeHtml(s.table_id)}`).join(', ') || '—';
-                    const isBest = r.cost === best;
-                    return `<tr class="${isBest ? 'best' : ''}">
-                        <td><strong>${name}</strong><div class="muted">${how}</div></td>
-                        <td class="num">${r.cost}${isBest ? ' <span class="pill">best</span>' : ''}</td>
-                        <td class="num">${r.guests_seated}</td>
-                        <td class="num">${r.wasted_seats}</td>
-                        <td><div>${seats}</div><div class="muted">${solverDetail(key, r)}</div></td>
-                    </tr>`;
+                list.innerHTML = queue.map((q, index) => {
+                    const waitMinutes = Math.floor((Date.now() - new Date(q.joined_at)) / 60000);
+                    const called = q.status === 'called';
+                    return `
+                    <article class="row-card queue-row ${called ? 'is-called' : ''}">
+                        <div>
+                            <h4><span class="queue-pos">${index + 1}</span>${escapeHtml(q.customer_name)} ${called ? '<span class="status-chip status-called">called</span>' : ''}</h4>
+                            <p>Party of ${q.group_size} · ${escapeHtml(q.phone || 'No phone')}</p>
+                            <p class="wait-time-text ${waitMinutes > 20 ? 'is-long' : ''}">Waiting <span class="live-timer" data-joined="${escapeHtml(q.joined_at)}">${waitMinutes}</span> min</p>
+                        </div>
+                        <div class="row-actions">
+                            ${called ? '' : `<button class="btn btn-secondary" onclick="updateQueueStatus(${q.queue_id}, 'called')">Call</button>`}
+                            <button class="btn btn-primary" onclick="updateQueueStatus(${q.queue_id}, 'seated')">Seated</button>
+                            <button class="btn btn-ghost" onclick="updateQueueStatus(${q.queue_id}, 'left')">Remove</button>
+                        </div>
+                    </article>`;
                 }).join('');
-
-                const context = mode === 'demo'
-                    ? `<p class="muted" style="margin-bottom:10px;">Parties ${data.instance.parties.map((p) => `${escapeHtml(p.id)}(${p.size})`).join(', ')} · Tables ${data.instance.tables.map((t) => `${escapeHtml(t.id)}(${t.capacity})`).join(', ')}</p>`
-                    : `<p class="muted" style="margin-bottom:10px;">${data.parties} waiting part${data.parties === 1 ? 'y' : 'ies'}, ${data.tables} vacant table${data.tables === 1 ? '' : 's'}. Party and table IDs are queue and table IDs.</p>`;
-                const apply = mode === 'live' && results.csp.seated.length
-                    ? `<button class="ai-btn" style="margin-top:12px;" onclick="applyOptimizer()">Seat guests using the CSP result</button>` : '';
-
-                box.innerHTML = `${context}<div class="table-scroll"><table class="ai-table">
-                    <thead><tr><th>Algorithm</th><th class="num">Cost</th><th class="num">Guests seated</th><th class="num">Wasted seats</th><th>Assignment</th></tr></thead>
-                    <tbody>${rows}</tbody></table></div>${apply}`;
             } catch (error) {
-                box.innerHTML = `<p style="color:#d9534f;">${escapeHtml(error.message)}</p>`;
+                list.innerHTML = errorState(error.message);
             }
         }
 
-        async function applyOptimizer() {
-            if (!confirm('Seat these guests and mark their tables as occupied?')) return;
-            const restaurantId = localStorage.getItem('restaurant_id');
+        // "Seated" gives the party the smallest free table that fits and marks
+        // it occupied. If none fits, staff can still seat them without one.
+        async function updateQueueStatus(queueId, status, extra = {}) {
             try {
-                const res = await fetch(`${API_ROOT}/queue/optimize/${restaurantId}`, {
-                    method: 'POST', headers: adminHeaders(), body: JSON.stringify({ algorithm: 'csp', apply: true })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'Could not apply allocation.');
-                alert(`Seated ${data.assignments.length} part${data.assignments.length === 1 ? 'y' : 'ies'}: ` +
-                    data.assignments.map((a) => `${a.group_size} guests → table ${a.table_no}`).join(', '));
-                runOptimizer('live');
-                loadLiveQueue(restaurantId);
+                const data = await adminFetch(`/queue/update/${queueId}`, { method: 'PUT', body: JSON.stringify({ status, ...extra }) });
+                if (status === 'seated') toast(data.table_no ? `Seated at table ${data.table_no}.` : 'Seated without a table.', 'success');
+                await loadLiveQueue();
             } catch (error) {
-                alert(error.message);
+                if (error.status === 409 && error.data && error.data.can_seat_without_table) {
+                    if (confirm(`${error.message}\n\nSeat them anyway without a table (e.g. at the bar)?`)) {
+                        return updateQueueStatus(queueId, status, { without_table: true });
+                    }
+                    return;
+                }
+                toast(error.message, 'error');
             }
         }
 
+        // Every 30 s, guests who have waited a minute are seated at the
+        // best-fitting free table — except while staff are reviewing a
+        // seating plan, which that would make out of date.
+        async function autoSeatReadyGuests() {
+            if (!document.getElementById('seating-plan').hidden) return;
+            try {
+                const data = await adminFetch(`/queue/auto-allocate/${restaurantId}`, { method: 'POST' });
+                if (data.allocated) {
+                    toast(`Seated ${data.assignments.map((a) => `${a.group_size} at table ${a.table_no}`).join(', ')}.`, 'success');
+                    await loadLiveQueue();
+                }
+            } catch (error) {
+                console.error('Auto-seating failed:', error);
+            }
+        }
+
+        setInterval(() => {
+            document.querySelectorAll('.live-timer').forEach((span) => {
+                const waitMinutes = Math.floor((Date.now() - new Date(span.dataset.joined)) / 60000);
+                span.textContent = waitMinutes;
+                span.closest('.wait-time-text').classList.toggle('is-long', waitMinutes > 20);
+            });
+        }, 30000);
+        setInterval(autoSeatReadyGuests, 30000);
+        setInterval(loadLiveQueue, 15000);
+
+        // ── Seating plan ─────────────────────────────────────────────────
+        // Proposes seats for everyone waiting at once: each party gets the
+        // smallest free table that fits (a pair gets a 2-seater, else a 4,
+        // never a 6 while a 4 is free), as many guests as possible are
+        // seated, and when not everyone fits, those waiting longest go first.
+        let currentPlan = null;
+
+        function closeSeatingPlan() {
+            currentPlan = null;
+            document.getElementById('seating-plan').hidden = true;
+        }
+
+        async function planSeating() {
+            const panel = document.getElementById('seating-plan');
+            panel.hidden = false;
+            panel.innerHTML = '<p class="muted">Working out the best seating…</p>';
+            try {
+                const data = await adminFetch(`/queue/optimize/${restaurantId}`, { method: 'POST', body: JSON.stringify({ algorithm: 'plan' }) });
+                const { plan, arrival_order: arrival } = data;
+                if (data.parties_waiting === 0) {
+                    panel.innerHTML = `<p class="muted">Nobody is waiting right now.</p><div class="plan-actions"><button class="btn btn-ghost" onclick="closeSeatingPlan()">Close</button></div>`;
+                    return;
+                }
+                if (plan.seats.length === 0) {
+                    panel.innerHTML = `<p class="muted">No free table fits anyone waiting (${plural(data.free_tables, 'table', 'tables')} free).</p><div class="plan-actions"><button class="btn btn-ghost" onclick="closeSeatingPlan()">Close</button></div>`;
+                    return;
+                }
+                currentPlan = plan;
+
+                const extra = plan.guests_seated - arrival.guests_seated;
+                const comparison = extra > 0
+                    ? `Seats ${plural(extra, 'more guest', 'more guests')} than seating strictly in arrival order.`
+                    : plan.empty_seats < arrival.empty_seats
+                        ? `Leaves ${plural(arrival.empty_seats - plan.empty_seats, 'fewer empty seat', 'fewer empty seats')} than seating strictly in arrival order.`
+                        : 'Same result as seating in arrival order.';
+
+                panel.innerHTML = `
+                    <div class="plan-summary">
+                        <strong>${plural(plan.guests_seated, 'guest', 'guests')} at ${plural(plan.seats.length, 'table', 'tables')}</strong>
+                        <span>${plural(plan.empty_seats, 'empty seat', 'empty seats')} · ${comparison}</span>
+                    </div>
+                    <ul class="plan-list">
+                        ${plan.seats.map((s) => `<li><span>${escapeHtml(s.name)} · party of ${s.size}</span><span class="plan-table">Table ${escapeHtml(s.table_no)} <small>${s.capacity} seats</small></span></li>`).join('')}
+                    </ul>
+                    ${plan.still_waiting.length ? `<p class="plan-waiting">Still waiting: ${plan.still_waiting.map((w) => `${escapeHtml(w.name)} (${w.size})`).join(', ')}</p>` : ''}
+                    <div class="plan-actions">
+                        <button class="btn btn-primary" onclick="applySeatingPlan()">Seat these guests</button>
+                        <button class="btn btn-ghost" onclick="closeSeatingPlan()">Cancel</button>
+                    </div>`;
+            } catch (error) {
+                panel.innerHTML = errorState(error.message);
+            }
+        }
+
+        // Sends back exactly the plan shown; if the queue changed in the
+        // meantime the server refuses and we show a fresh plan instead.
+        async function applySeatingPlan() {
+            if (!currentPlan) return;
+            try {
+                const data = await adminFetch(`/queue/optimize/${restaurantId}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ algorithm: 'plan', apply: true, seats: currentPlan.seats.map((s) => ({ queue_id: s.queue_id, table_id: s.table_id })) })
+                });
+                closeSeatingPlan();
+                toast(`Seated ${plural(data.assignments.length, 'party', 'parties')}.`, 'success');
+                await loadLiveQueue();
+            } catch (error) {
+                if (error.data && error.data.stale) {
+                    toast('The queue changed since this plan was made. Here is an updated plan.', 'error');
+                    await planSeating();
+                } else {
+                    toast(error.message, 'error');
+                }
+            }
+        }
+
+        // ── Busy times ───────────────────────────────────────────────────
+        // Bookings and walk-ins from the last 90 days, grouped into the time
+        // windows guests actually arrive in.
         function hhmmToMinutes(t) {
             const [h, m] = t.split(':').map(Number);
             return h * 60 + m;
@@ -645,44 +570,45 @@
 
         async function loadPeakHours() {
             const box = document.getElementById('peak-hours');
-            const restaurantId = localStorage.getItem('restaurant_id');
             const source = document.getElementById('peak-source').value;
-            box.innerHTML = '<p style="color:#666;">Clustering…</p>';
+            box.innerHTML = '<p class="muted">Loading…</p>';
             try {
-                const res = await fetch(`${API_ROOT}/admin/analytics/peak-hours/${restaurantId}?source=${source}`, { headers: adminHeaders() });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'Could not load analytics.');
-
+                const data = await adminFetch(`/admin/analytics/peak-hours/${restaurantId}?source=${encodeURIComponent(source)}`);
                 const max = Math.max(1, ...data.hourly);
-                // Which cluster each hour's midpoint falls inside (for bar colour).
-                const clusterOfHour = (h) => data.clusters.findIndex((c) => {
+                const windowOfHour = (h) => data.clusters.findIndex((c) => {
                     const start = hhmmToMinutes(c.window_start);
                     const end = hhmmToMinutes(c.window_end);
                     const mid = h * 60 + 30;
                     return start <= end ? mid >= start && mid <= end : mid >= start || mid <= end;
                 });
                 const bars = data.hourly.map((n, h) => {
-                    const c = clusterOfHour(h);
+                    const c = windowOfHour(h);
                     const cls = c === -1 ? '' : data.clusters[c].label;
-                    return `<div class="bar-col" title="${String(h).padStart(2, '0')}:00 · ${n} booking${n === 1 ? '' : 's'}">
+                    return `<div class="bar-col" title="${String(h).padStart(2, '0')}:00 · ${plural(n, 'arrival', 'arrivals')}">
                         <div class="bar ${cls}" style="height:${Math.round((n / max) * 100)}%"></div>
                         <span class="bar-label">${h % 3 === 0 ? String(h).padStart(2, '0') : ''}</span>
                     </div>`;
                 }).join('');
 
+                const LABEL = { peak: 'Busiest', busy: 'Busy', quiet: 'Quieter' };
                 const cards = data.clusters.map((c) => `
                     <div class="peak-card ${c.label}">
-                        <div class="peak-tag">${c.label}</div>
+                        <div class="peak-tag">${LABEL[c.label]}</div>
                         <div class="peak-time">${c.window_start}–${c.window_end}</div>
-                        <div class="muted">centred on ${c.center} · ${c.count} bookings (${c.share}%)</div>
+                        <div class="muted">${c.share}% of guests · most around ${c.center}</div>
                     </div>`).join('');
 
+                const busiest = data.clusters[0];
+                const tip = busiest
+                    ? `<p class="staff-tip">Plan your fullest shift for <strong>${busiest.window_start}–${busiest.window_end}</strong>, when ${busiest.share}% of guests arrive.</p>`
+                    : '';
+
                 box.innerHTML = `
-                    <p class="muted" style="margin-bottom:12px;">${data.samples} bookings and arrivals in the last ${data.days} days${data.k ? ` · ${data.k} time windows found (silhouette score ${data.silhouette}; closer to 1 means more clearly separated)` : ''}</p>
+                    <p class="muted" style="margin-bottom:12px;">Based on ${plural(data.samples, 'booking or walk-in', 'bookings and walk-ins')} in the last ${data.days} days.</p>
                     <div class="hour-chart">${bars}</div>
-                    ${data.clusters.length ? `<div class="peak-cards">${cards}</div>` : `<p style="color:#666;margin-top:12px;">${escapeHtml(data.message || 'No clusters found.')}</p>`}`;
+                    ${data.clusters.length ? `${tip}<div class="peak-cards">${cards}</div>` : emptyState('Not enough history yet', escapeHtml(data.message || 'Busy times appear once there are at least 10 bookings or walk-ins.'))}`;
             } catch (error) {
-                box.innerHTML = `<p style="color:#d9534f;">${escapeHtml(error.message)}</p>`;
+                box.innerHTML = errorState(error.message);
             }
         }
     </script>
