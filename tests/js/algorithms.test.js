@@ -115,6 +115,83 @@ test('empty queue or no tables is handled', () => {
     assert.equal(ta.geneticAlgorithm(ta.createProblem([], [])).seated.length, 0);
 });
 
+// ── Seating rule: smallest table that fits, next size up if not free ──
+test('a pair gets a 2-seater, else a 4, never a 6 while a 4 is free', () => {
+    const tables = [{ capacity: 6, table_no: 'T5' }, { capacity: 4, table_no: 'T3' }, { capacity: 2, table_no: 'T1' }];
+    assert.equal(ta.smallestFittingTable(2, tables).capacity, 2);
+    assert.equal(ta.smallestFittingTable(2, tables.filter((t) => t.capacity !== 2)).capacity, 4);
+    assert.equal(ta.smallestFittingTable(5, tables).capacity, 6);
+    assert.equal(ta.smallestFittingTable(9, tables), null);
+    assert.equal(ta.smallestFittingTable(4, [{ capacity: 4, table_no: 'T10' }, { capacity: 4, table_no: 'T2' }]).table_no, 'T2');
+});
+
+test('batch seating gives the pair the 4 and the four the 6, not the other way round', () => {
+    const p = ta.createProblem([{ id: 'pair', size: 2 }, { id: 'four', size: 4 }], [{ id: 'T6', capacity: 6 }, { id: 'T4', capacity: 4 }]);
+    for (const solver of Object.values(ta.SOLVERS)) {
+        const seats = Object.fromEntries(solver(p).seated.map((s) => [s.party_id, s.table_id]));
+        assert.deepEqual(seats, { pair: 'T4', four: 'T6' });
+    }
+});
+
+test('every planner respects the size order on random queues', () => {
+    const rand = ta.rng(77);
+    for (let trial = 0; trial < 30; trial++) {
+        const parties = Array.from({ length: 1 + Math.floor(rand() * 8) }, (_, i) => ({ id: i, size: 1 + Math.floor(rand() * 6), waited_min: Math.floor(rand() * 40) }));
+        const tables = Array.from({ length: 1 + Math.floor(rand() * 8) }, (_, i) => ({ id: `T${i}`, capacity: [2, 2, 4, 4, 6, 8][Math.floor(rand() * 6)] }));
+        const p = ta.createProblem(parties, tables);
+        for (const r of [ta.solveCSP(p), ta.hillClimb(p), ta.geneticAlgorithm(p, { generations: 30 }), ta.planSeating(p), { assignment: ta.greedyFifo(p) }]) {
+            assert.ok(ta.isValid(p, r.assignment));
+            assert.ok(ta.followsSizeOrder(p, r.assignment), `trial ${trial}`);
+        }
+    }
+});
+
+test('planSeating is exact on a normal queue and falls back gracefully on a huge one', () => {
+    const small = ta.planSeating(demo());
+    assert.equal(small.method, 'exact');
+    assert.equal(small.cost, ta.solveCSP(demo()).cost);
+
+    const rand = ta.rng(5);
+    const parties = Array.from({ length: 30 }, (_, i) => ({ id: i, size: [1, 2, 2, 3, 4, 4, 6][Math.floor(rand() * 7)], waited_min: 60 - i * 2 }));
+    const tables = Array.from({ length: 24 }, (_, i) => ({ id: `T${i}`, capacity: [2, 2, 4, 4, 6, 8][Math.floor(rand() * 6)] }));
+    const p = ta.createProblem(parties, tables);
+    const big = ta.planSeating(p, { exactNodeLimit: 2000 });
+    assert.notEqual(big.method, 'exact');
+    assert.ok(big.cost <= ta.cost(p, ta.greedyFifo(p)), 'never worse than seating in arrival order');
+    assert.ok(ta.followsSizeOrder(p, big.assignment));
+});
+
+test('an approved plan is applied exactly, and a stale one is refused', () => {
+    const p = demo();
+    const plan = ta.planSeating(p);
+    const seats = plan.seated.map((s) => ({ party_id: s.party_id, table_id: s.table_id }));
+
+    const ok = ta.assignmentFromSeats(p, seats);
+    assert.deepEqual(ok.assignment, plan.assignment);
+
+    // A seated party left the queue before staff pressed "Seat".
+    const gone = ta.createProblem(ta.DEMO_INSTANCE.parties.filter((x) => x.id !== seats[0].party_id), ta.DEMO_INSTANCE.tables);
+    assert.match(ta.assignmentFromSeats(gone, seats).error, /changed/);
+
+    // A smaller table that fits became free in the meantime.
+    const pair = ta.createProblem([{ id: 'p', size: 2 }], [{ id: 'T6', capacity: 6 }, { id: 'T2', capacity: 2 }]);
+    assert.match(ta.assignmentFromSeats(pair, [{ party_id: 'p', table_id: 'T6' }]).error, /smaller table/);
+    assert.match(ta.assignmentFromSeats(pair, []).error, /no seats/);
+});
+
+test('ties go to the lowest table number, numerically (T2 before T10)', () => {
+    const p = ta.createProblem([{ id: 'a', size: 4 }], [{ id: 10, capacity: 4, table_no: 'T10' }, { id: 2, capacity: 4, table_no: 'T2' }]);
+    assert.equal(p.tables[ta.greedyFifo(p)[0]].table_no, 'T2');
+});
+
+test('exact search finishes a 14-party queue within the planner time budget', () => {
+    const rand = ta.rng(5);
+    const parties = Array.from({ length: 14 }, (_, i) => ({ id: i, size: [1, 2, 2, 2, 3, 4, 4, 5, 6, 8][Math.floor(rand() * 10)], waited_min: 28 - i * 2 }));
+    const tables = Array.from({ length: 12 }, (_, i) => ({ id: `T${i}`, capacity: [2, 2, 2, 4, 4, 4, 6, 6, 8][Math.floor(rand() * 9)] }));
+    const plan = ta.planSeating(ta.createProblem(parties, tables), { exactTimeMs: 2000 });
+    assert.equal(plan.method, 'exact');
+});
+
 // ── Tic-tac-toe ───────────────────────────────────────────────────────
 test('AI takes an immediate win and blocks an immediate loss', () => {
     const win = ['O', 'O', null, 'X', 'X', null, null, null, null];
@@ -151,6 +228,33 @@ test('perfect play from an empty board is a draw', () => {
         turn = turn === 'X' ? 'O' : 'X';
     }
     assert.equal(ttt.winner(board), null);
+});
+
+test('Hard never loses; Easy still takes wins and blocks, but can be forked', () => {
+    // Hard: play every possible guest strategy against it — it never loses.
+    const explore = (board) => {
+        for (const i of ttt.emptyCells(board)) {
+            const b = [...board];
+            b[i] = 'X';
+            assert.notEqual(ttt.winner(b)?.player, 'X', 'guest should never beat Hard');
+            if (ttt.winner(b) || !ttt.emptyCells(b).length) continue;
+            b[ttt.chooseMove(b, 'hard')] = 'O';
+            if (!ttt.winner(b) && ttt.emptyCells(b).length) explore(b);
+        }
+    };
+    explore(Array(9).fill(null));
+
+    const rand = ta.rng(1);
+    assert.equal(ttt.chooseMove(['O', 'O', null, 'X', 'X', null, null, null, null], 'easy', rand), 2);
+    assert.equal(ttt.chooseMove(['X', 'X', null, null, 'O', null, null, null, null], 'easy', rand), 2);
+
+    // X has corners 0 and 8, O the centre: the only safe replies are edges.
+    // Easy only looks one move ahead, so across seeds it sometimes plays a
+    // corner and walks into the fork — which is what makes it beatable.
+    const board = ['X', null, null, null, 'O', null, null, null, 'X'];
+    const replies = new Set(Array.from({ length: 40 }, (_, s) => ttt.chooseMove(board, 'easy', ta.rng(s))));
+    assert.ok([2, 6].some((corner) => replies.has(corner)), 'Easy should sometimes miss the fork');
+    assert.ok([1, 3, 5, 7].includes(ttt.chooseMove(board, 'hard')), 'Hard should always block the fork');
 });
 
 // ── Expert system ─────────────────────────────────────────────────────

@@ -22,8 +22,14 @@
 //   Domains:     vacant tables with capacity >= party size, plus UNSEATED.
 //   Constraints: (1) capacity — enforced by the domain itself;
 //                (2) all-different — no table holds two parties
-//                    (UNSEATED is exempt).
-//   Objective:   minimise cost(assignment) below.
+//                    (UNSEATED is exempt);
+//                (3) size order — nobody sits at a bigger table than the
+//                    smallest free size that fits them. A party of 2 gets a
+//                    2-seater; if none is free, a 4-seater — never a 6 while
+//                    a 4 stands empty. See followsSizeOrder().
+//   Objective:   minimise cost(assignment) below; ties are broken by
+//                wasteSpread() so empty seats are spread evenly — given a
+//                4 and a 6 for a pair and a four, the pair gets the 4.
 //
 // ── Cost ─────────────────────────────────────────────────────────────
 //   wasted seats (capacity − party size, summed over seated parties)
@@ -74,6 +80,57 @@ function isValid(problem, assignment) {
     });
 }
 
+/**
+ * Size order (constraint 3): no seated party may be at a table while a
+ * SMALLER table that still fits them is left free.
+ */
+function followsSizeOrder(problem, assignment) {
+    const used = new Set(assignment.filter((t) => t !== UNSEATED));
+    const freeCaps = problem.tables.filter((_, idx) => !used.has(idx)).map((t) => t.capacity);
+    return assignment.every((t, i) => {
+        if (t === UNSEATED) return true;
+        const size = problem.parties[i].size;
+        const cap = problem.tables[t].capacity;
+        return !freeCaps.some((c) => c >= size && c < cap);
+    });
+}
+
+/** Tie-breaker: sum of squared empty seats — prefers 2 + 2 empty over 4 + 0. */
+function wasteSpread(problem, assignment) {
+    return assignment.reduce((s, t, i) => (t === UNSEATED ? s : s + (problem.tables[t].capacity - problem.parties[i].size) ** 2), 0);
+}
+
+/** Lexicographic comparison on (cost, spread). Negative = a is better. */
+function compareScores(a, b) {
+    return a.cost - b.cost || a.spread - b.spread;
+}
+
+const scoreOf = (problem, assignment) => ({ cost: cost(problem, assignment), spread: wasteSpread(problem, assignment) });
+
+/**
+ * Enforces size order by moving any seated party down to the smallest free
+ * table that fits them. Each move frees a bigger table and strictly cuts
+ * wasted seats, so this never makes an assignment worse.
+ */
+function tighten(problem, assignment) {
+    const out = [...assignment];
+    let moved = true;
+    while (moved) {
+        moved = false;
+        const used = new Set(out.filter((t) => t !== UNSEATED));
+        for (let i = 0; i < out.length && !moved; i++) {
+            if (out[i] === UNSEATED) continue;
+            const size = problem.parties[i].size;
+            let best = out[i];
+            problem.tables.forEach((t, idx) => {
+                if (!used.has(idx) && t.capacity >= size && t.capacity < problem.tables[best].capacity) best = idx;
+            });
+            if (best !== out[i]) { out[i] = best; moved = true; }
+        }
+    }
+    return out;
+}
+
 /** Human-readable summary shared by every solver's output. */
 function describe(problem, assignment) {
     const seated = [];
@@ -104,20 +161,17 @@ function describe(problem, assignment) {
 // one guest at a time, applied to the whole queue.
 function greedyFifo(problem) {
     const used = new Set();
-    const order = problem.tables
-        .map((t, idx) => idx)
-        .sort((a, b) => problem.tables[a].capacity - problem.tables[b].capacity);
-
+    const indexed = problem.tables.map((t, idx) => ({ ...t, idx }));
     return problem.parties.map((p) => {
-        const t = order.find((idx) => !used.has(idx) && problem.tables[idx].capacity >= p.size);
-        if (t === undefined) return UNSEATED;
-        used.add(t);
-        return t;
+        const fit = smallestFittingTable(p.size, indexed.filter((t) => !used.has(t.idx)));
+        if (!fit) return UNSEATED;
+        used.add(fit.idx);
+        return fit.idx;
     });
 }
 
 // ── CSP: backtracking + MRV + LCV + forward checking + branch & bound ─
-function solveCSP(problem, { nodeLimit = 200000 } = {}) {
+function solveCSP(problem, { nodeLimit = 2000000, timeLimitMs = Infinity } = {}) {
     const { parties, tables, weights } = problem;
     const n = parties.length;
 
@@ -143,24 +197,34 @@ function solveCSP(problem, { nodeLimit = 200000 } = {}) {
     };
 
     let best = greedyFifo(problem); // incumbent → gives B&B a real bound from node 1
-    let bestCost = cost(problem, best);
+    let bestScore = scoreOf(problem, best);
     let nodes = 0;
     let pruned = 0;
     let truncated = false;
+    const deadline = Date.now() + timeLimitMs;
 
-    function backtrack(assigned, domains, costSoFar, depth) {
-        if (nodes >= nodeLimit) { truncated = true; return; }
+    const valueSpread = (i, t) => (t === UNSEATED ? 0 : (tables[t].capacity - parties[i].size) ** 2);
+
+    function backtrack(assigned, domains, costSoFar, spreadSoFar, depth) {
+        if (truncated || nodes >= nodeLimit || (nodes % 1024 === 0 && Date.now() > deadline)) { truncated = true; return; }
         nodes++;
 
         if (depth === n) {
-            if (costSoFar < bestCost) {
-                bestCost = costSoFar;
-                best = parties.map((_, i) => assigned[i]);
+            const candidate = parties.map((_, i) => assigned[i]);
+            if (!followsSizeOrder(problem, candidate)) return; // constraint (3)
+            const score = scoreOf(problem, candidate);
+            if (compareScores(score, bestScore) < 0) {
+                bestScore = score;
+                best = candidate;
             }
             return;
         }
 
-        if (costSoFar + lowerBound(domains, assigned) >= bestCost) { pruned++; return; }
+        // Prune on cost; on an exact cost tie, prune only if this branch
+        // can't spread empty seats better either (spread only grows as
+        // parties are added, so spreadSoFar is a valid lower bound).
+        const bound = costSoFar + lowerBound(domains, assigned);
+        if (bound > bestScore.cost || (bound === bestScore.cost && spreadSoFar >= bestScore.spread)) { pruned++; return; }
 
         // MRV: the party with the fewest remaining tables (ties → bigger
         // party first, since big parties are the hardest to place).
@@ -190,12 +254,12 @@ function solveCSP(problem, { nodeLimit = 200000 } = {}) {
                 : domains.map((d, i) => (i === v || assigned[i] !== undefined ? d : d.filter((x) => x !== t)));
 
             assigned[v] = t;
-            backtrack(assigned, newDomains, costSoFar + valueCost(v, t), depth + 1);
+            backtrack(assigned, newDomains, costSoFar + valueCost(v, t), spreadSoFar + valueSpread(v, t), depth + 1);
             assigned[v] = undefined;
         }
     }
 
-    backtrack(new Array(n).fill(undefined), initialDomains, 0, 0);
+    backtrack(new Array(n).fill(undefined), initialDomains, 0, 0, 0);
 
     return {
         algorithm: 'csp',
@@ -250,8 +314,8 @@ function neighbours(problem, assignment) {
 
 function hillClimb(problem, { start = greedyFifo(problem), maxSteps = 1000 } = {}) {
     let current = start;
-    let currentCost = cost(problem, current);
-    const trace = [{ step: 0, move: 'start (greedy FIFO)', cost: currentCost }];
+    let currentScore = scoreOf(problem, current);
+    const trace = [{ step: 0, move: 'start (greedy FIFO)', cost: currentScore.cost }];
     let stoppedBecause = 'max_steps';
     let evaluated = 0;
 
@@ -261,21 +325,21 @@ function hillClimb(problem, { start = greedyFifo(problem), maxSteps = 1000 } = {
         if (candidates.length === 0) { stoppedBecause = 'no_neighbours'; break; }
 
         let bestN = null;
-        let bestNCost = Infinity;
+        let bestNScore = { cost: Infinity, spread: Infinity };
         let sideways = 0;
         for (const c of candidates) {
-            const cCost = cost(problem, c.assignment);
-            if (cCost === currentCost) sideways++;
-            if (cCost < bestNCost) { bestNCost = cCost; bestN = c; }
+            const cScore = scoreOf(problem, c.assignment);
+            if (cScore.cost === currentScore.cost) sideways++;
+            if (compareScores(cScore, bestNScore) < 0) { bestNScore = cScore; bestN = c; }
         }
 
-        if (bestNCost >= currentCost) {
+        if (compareScores(bestNScore, currentScore) >= 0) {
             stoppedBecause = sideways > 0 ? 'plateau' : 'local_optimum';
             break;
         }
         current = bestN.assignment;
-        currentCost = bestNCost;
-        trace.push({ step, move: bestN.move, cost: currentCost });
+        currentScore = bestNScore;
+        trace.push({ step, move: bestN.move, cost: currentScore.cost });
     }
 
     return {
@@ -290,7 +354,9 @@ function hillClimb(problem, { start = greedyFifo(problem), maxSteps = 1000 } = {
 // Chromosome: the assignment array itself (gene i = table index for party
 // i, or UNSEATED). Crossover/mutation can create invalid children (two
 // parties on one table, or a party too big for its table); repair() fixes
-// them by unseating the offending party, keeping every individual valid.
+// them by unseating the offending party, then tighten() moves anyone at
+// an oversized table down a size — so every individual is valid and
+// follows the size order.
 
 /** Seeded PRNG (mulberry32) — same seed, same run, reproducible demos. */
 function rng(seed) {
@@ -304,10 +370,20 @@ function rng(seed) {
     };
 }
 
+/** Seeded Fisher–Yates shuffle of 0..n-1 (uniform, unlike sort(() => rand() - 0.5)). */
+function shuffledIndices(n, rand) {
+    const out = Array.from({ length: n }, (_, i) => i);
+    for (let i = n - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+}
+
 function repair(problem, genes, rand) {
     const used = new Set();
     // Visit genes in random order so no party is systematically favoured.
-    const order = genes.map((_, i) => i).sort(() => rand() - 0.5);
+    const order = shuffledIndices(genes.length, rand);
     const out = [...genes];
     for (const i of order) {
         const t = out[i];
@@ -315,7 +391,7 @@ function repair(problem, genes, rand) {
         if (used.has(t) || problem.tables[t].capacity < problem.parties[i].size) out[i] = UNSEATED;
         else used.add(t);
     }
-    return out;
+    return tighten(problem, out);
 }
 
 function geneticAlgorithm(problem, {
@@ -338,18 +414,34 @@ function geneticAlgorithm(problem, {
         return { algorithm: 'genetic', assignment: [], ...describe(problem, []), stats: { generations: 0, best_cost_by_generation: [] } };
     }
 
-    // Seed the population with the greedy baseline plus random individuals.
+    // Initial population: the arrival-order plan, then half "what if these
+    // parties had arrived in a different order?" plans (smallest-fit in a
+    // shuffled order — each one sensible, all different), then random
+    // plans for diversity. Purely random plans alone leave so many parties
+    // unseated that crossover has nothing good to combine on big queues.
     let population = [greedyFifo(problem)];
+    const shuffledGreedy = () => {
+        const order = shuffledIndices(n, rand);
+        const used = new Set();
+        const genes = new Array(n).fill(UNSEATED);
+        for (const i of order) {
+            const fit = smallestFittingTable(parties[i].size,
+                tables.map((t, idx) => ({ ...t, idx })).filter((t) => !used.has(t.idx)));
+            if (fit) { genes[i] = fit.idx; used.add(fit.idx); }
+        }
+        return genes;
+    };
+    while (population.length < populationSize / 2) population.push(shuffledGreedy());
     while (population.length < populationSize) {
         population.push(repair(problem, parties.map((_, i) => randomGene(i)), rand));
     }
 
-    const scored = (pop) => pop.map((g) => ({ genes: g, cost: cost(problem, g) })).sort((a, b) => a.cost - b.cost);
+    const scored = (pop) => pop.map((g) => ({ genes: g, ...scoreOf(problem, g) })).sort(compareScores);
     const tournament = (pool) => {
         let winner = null;
         for (let k = 0; k < tournamentSize; k++) {
             const c = pool[Math.floor(rand() * pool.length)];
-            if (!winner || c.cost < winner.cost) winner = c;
+            if (!winner || compareScores(c, winner) < 0) winner = c;
         }
         return winner.genes;
     };
@@ -377,6 +469,81 @@ function geneticAlgorithm(problem, {
         ...describe(problem, best),
         stats: { generations, population_size: populationSize, seed, best_cost_by_generation: history }
     };
+}
+
+/**
+ * One party, one table — the rule a host follows at the door and the one
+ * reservations use: the smallest free table that fits. A party of 2 gets a
+ * 2-seater; if none is free, a 4-seater; a 6 only if no 2 or 4 is free.
+ * Ties on size go to the lowest table number.
+ * @param {Array<{capacity, table_no?}>} freeTables
+ */
+function smallestFittingTable(partySize, freeTables) {
+    return freeTables
+        .filter((t) => Number(t.capacity) >= partySize)
+        .sort((a, b) => Number(a.capacity) - Number(b.capacity) ||
+            String(a.table_no ?? '').localeCompare(String(b.table_no ?? ''), undefined, { numeric: true }))[0] || null;
+}
+
+/**
+ * What the app actually runs when staff press "Plan seating" (and on every
+ * auto-allocate). Each technique does the job it's best at:
+ *
+ *   1. Exact search (solveCSP) — for a normal queue this finishes quickly
+ *      and the plan is provably the best possible.
+ *   2. If the queue is too big to search exhaustively within the budget,
+ *      evolutionary search (geneticAlgorithm) explores widely for a good plan…
+ *   3. …and a local-improvement pass (hillClimb) polishes it — a few swaps
+ *      and moves the GA's random search tends to leave on the table.
+ *
+ * Exact search gets a fixed time budget; if it runs out, the best of its
+ * incumbent and the polished GA plan wins.
+ * `method` says which path produced it, for logs and the "how was this
+ * planned?" note in the dashboard.
+ */
+function planSeating(problem, { exactTimeMs = 250, exactNodeLimit } = {}) {
+    // A time budget, not a node count: nodes cost ~0.3µs, so 250 ms covers
+    // any normal queue exhaustively (a 14-party queue needs ~160 ms).
+    const exact = solveCSP(problem, { timeLimitMs: exactTimeMs, ...(exactNodeLimit ? { nodeLimit: exactNodeLimit } : {}) });
+    if (exact.stats.optimal) {
+        return { ...exact, method: 'exact', stats: { exact: exact.stats } };
+    }
+
+    const evolved = geneticAlgorithm(problem);
+    const polished = hillClimb(problem, { start: evolved.assignment });
+    const useExact = compareScores(scoreOf(problem, exact.assignment), scoreOf(problem, polished.assignment)) <= 0;
+    const chosen = useExact ? exact : polished;
+    return {
+        ...chosen,
+        method: useExact ? 'exact_partial' : 'evolved',
+        stats: {
+            exact: exact.stats,
+            evolved: { generations: evolved.stats.generations, cost: evolved.cost },
+            polished: { steps: polished.stats.steps, cost: polished.cost }
+        }
+    };
+}
+
+/**
+ * Turns a plan staff approved on screen ([{ party_id, table_id }]) back into
+ * an assignment for the CURRENT problem, so exactly what they saw is what
+ * gets seated. Returns { assignment } or { error } if the queue or tables
+ * changed in between (someone left, a table was taken) or the plan breaks
+ * a seating rule.
+ */
+function assignmentFromSeats(problem, seats) {
+    if (!Array.isArray(seats) || seats.length === 0) return { error: 'The plan has no seats.' };
+    const assignment = problem.parties.map(() => UNSEATED);
+    for (const seat of seats) {
+        const i = problem.parties.findIndex((p) => String(p.id) === String(seat.party_id));
+        const t = problem.tables.findIndex((tb) => String(tb.id) === String(seat.table_id));
+        if (i === -1 || t === -1) return { error: 'The queue or tables changed since this plan was made.' };
+        if (assignment[i] !== UNSEATED) return { error: 'A party appears twice in the plan.' };
+        assignment[i] = t;
+    }
+    if (!isValid(problem, assignment)) return { error: 'The plan puts two parties at one table or a party at a table too small.' };
+    if (!followsSizeOrder(problem, assignment)) return { error: 'A smaller table that fits has become free since this plan was made.' };
+    return { assignment };
 }
 
 const SOLVERS = { csp: solveCSP, hill_climbing: hillClimb, genetic: geneticAlgorithm };
@@ -430,6 +597,12 @@ module.exports = {
     createProblem,
     cost,
     isValid,
+    followsSizeOrder,
+    wasteSpread,
+    tighten,
+    smallestFittingTable,
+    planSeating,
+    assignmentFromSeats,
     describe,
     greedyFifo,
     solveCSP,
