@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Q-Sense | Home</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-sans); }
         body { background-color: #f4f7f9; color: #333; }
 
    
@@ -164,7 +164,7 @@
 
     </main>
 
-    <div id="qsense-chatbot" style="position: fixed; right: 22px; bottom: 22px; z-index: 9999; font-family: 'Inter', sans-serif;">
+    <div id="qsense-chatbot" style="position: fixed; right: 22px; bottom: 22px; z-index: 9999; font-family: var(--font-sans);">
         <button id="chatbot-toggle" type="button" style="width: 64px; height: 64px; border: none; border-radius: 50%; background: linear-gradient(135deg, #3178c6, #245ea3); color: white; font-size: 28px; box-shadow: 0 12px 30px rgba(49,120,198,0.35); cursor: pointer;">💬</button>
 
         <div id="chatbot-panel" style="display: none; width: 340px; max-width: calc(100vw - 24px); background: white; border-radius: 18px; box-shadow: 0 20px 40px rgba(0,0,0,0.14); border: 1px solid #e7edf3; overflow: hidden; margin-bottom: 12px;">

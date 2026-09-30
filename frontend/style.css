@@ -2,14 +2,14 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Inter',-apple-system, BlinkMacSystemFont, 'Inter', Roboto, Oxygen, Ubuntu, Cantarell;
+    font-family: var(--font-sans);
 }
 
 body {
     background-color: #f4f7f9;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 100dvh;
 }
 
 .navbar {
@@ -628,8 +628,11 @@ label {
 
 /* Shared visual system */
 :root {
-    --font-sans: 'Inter', sans-serif;
+    --font-sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --text: #243447;
+    --ink: #101828;
+    --line: #e4e9f0;
+    --brand-soft: #eaf2fb;
     --muted-text: #667085;
     --brand: #3178c6;
     --brand-dark: #265ea1;
@@ -820,4 +823,70 @@ body.page-exit {
         transform: none;
         transition: none;
     }
+}
+
+/* ── Components shared across pages ─────────────────────────────────── */
+h1, h2, h3 { text-wrap: balance; letter-spacing: -0.01em; }
+p { text-wrap: pretty; }
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 38px;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.1s ease;
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.55; }
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-dark); }
+.btn-secondary { background: #fff; color: var(--brand); border-color: #c7d9ee; }
+.btn-secondary:hover { background: var(--brand-soft); border-color: var(--brand); }
+.btn-ghost { background: transparent; color: #475467; border-color: var(--line); }
+.btn-ghost:hover { background: #f2f4f7; color: var(--ink); }
+
+.muted { color: var(--muted-text); font-size: 0.88rem; }
+
+/* Numbers that update or line up in columns */
+.num, .position-number, .peak-time, .stat-card h2, [id^="stat-"] { font-variant-numeric: tabular-nums; }
+
+/* Toasts (see js/api.js → toast) */
+#toast-host {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    z-index: 10000;
+    display: grid;
+    gap: 8px;
+    width: min(92vw, 420px);
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+.toast {
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 0.92rem;
+    box-shadow: 0 10px 30px rgba(16, 24, 40, 0.18);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast-success { background: #0b5f3c; }
+.toast-error { background: #9a1c14; }
+
+@media (prefers-reduced-motion: reduce) {
+    .btn, .toast { transition: none; }
 }

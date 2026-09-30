@@ -61,7 +61,7 @@
         if (storedName) updateCustomerName(storedName);
 
         try {
-            const response = await fetch(`http://localhost:5000/api/users/${customerId}`);
+            const response = await fetch(`http://localhost:5000/api/users/${customerId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` } });
             if (!response.ok) return;
 
             const user = await response.json();
@@ -154,7 +154,8 @@
         form.parentNode.insertBefore(faq, form);
     }
 
-    ensureChatbot();
+    // The assistant helps guests (bookings, queue, wait times); staff pages don't need it.
+    if (!/^Admin/.test(location.pathname.split('/').pop())) ensureChatbot();
     addChatbotFaq();
     loadCustomerName();
 })();

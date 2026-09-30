@@ -1,19 +1,23 @@
 // frontend/js/tictactoe.js
 //
-// Tic-Tac-Toe vs. an AI, for the "waiting in queue" screen.
+// A quick game of tic-tac-toe on the queue screen, so the wait passes
+// faster. Two levels:
 //
-// Adversarial search: the AI (O) is MAX, the guest (X) is MIN. Terminal
-// utility is +10 for an AI win, −10 for a guest win, 0 for a draw, with
-// depth subtracted/added so the AI prefers faster wins and slower losses.
+//   Hard — the opponent searches the whole game tree (minimax with
+//          alpha-beta pruning) and never loses; the best a guest can do is
+//          draw.
+//   Easy — the same search, cut off one move ahead: it takes a win and
+//          blocks an obvious threat, but can't see a fork coming, and picks
+//          randomly between equally good moves so games vary.
 //
-//   minimax()   — plain exhaustive minimax.
-//   alphaBeta() — the same search with alpha-beta pruning: branches that
-//                 provably can't change the decision are skipped. It always
-//                 picks a move with the SAME value as minimax, but visits far
-//                 fewer nodes — both counts are shown in the UI.
+// Search details: the computer (O) is MAX, the guest (X) is MIN. A finished
+// game scores +10 / −10 / 0, adjusted by depth so it prefers quick wins and
+// slow losses. Positions past the Easy cut-off score 0 ("don't know yet").
+// minimax() is the unpruned reference search; alphaBeta() returns the same
+// value while skipping branches that can't change the decision — the tests
+// check both claims.
 //
-// Works in the browser (window.TicTacToe) and in Node (module.exports) so
-// the search itself is unit-tested.
+// Works in the browser (window.TicTacToe) and in Node (module.exports).
 
 (function (root) {
     const AI = 'O';
@@ -23,6 +27,7 @@
         [0, 3, 6], [1, 4, 7], [2, 5, 8],
         [0, 4, 8], [2, 4, 6]
     ];
+    const LEVELS = { easy: 2, hard: Infinity }; // search depth per level
 
     function winner(board) {
         for (const [a, b, c] of LINES) {
@@ -55,19 +60,20 @@
         return best;
     }
 
-    function alphaBeta(board, depth, isMax, alpha, beta, stats) {
+    function alphaBeta(board, depth, isMax, alpha, beta, stats, maxDepth = Infinity) {
         stats.nodes++;
         const u = utility(board, depth);
         if (u !== null) return u;
+        if (depth >= maxDepth) return 0; // beyond the look-ahead: unknown
 
         if (isMax) {
             let best = -Infinity;
             for (const i of emptyCells(board)) {
                 board[i] = AI;
-                best = Math.max(best, alphaBeta(board, depth + 1, false, alpha, beta, stats));
+                best = Math.max(best, alphaBeta(board, depth + 1, false, alpha, beta, stats, maxDepth));
                 board[i] = null;
                 alpha = Math.max(alpha, best);
-                if (alpha >= beta) { stats.prunes++; break; } // β-cutoff: MIN will never allow this
+                if (alpha >= beta) { stats.prunes++; break; } // MIN would never allow this line
             }
             return best;
         }
@@ -75,16 +81,16 @@
         let best = Infinity;
         for (const i of emptyCells(board)) {
             board[i] = HUMAN;
-            best = Math.min(best, alphaBeta(board, depth + 1, true, alpha, beta, stats));
+            best = Math.min(best, alphaBeta(board, depth + 1, true, alpha, beta, stats, maxDepth));
             board[i] = null;
             beta = Math.min(beta, best);
-            if (alpha >= beta) { stats.prunes++; break; } // α-cutoff: MAX will never allow this
+            if (alpha >= beta) { stats.prunes++; break; } // MAX would never allow this line
         }
         return best;
     }
 
     /**
-     * Picks the AI's move.
+     * Best move for the computer.
      * @param {Array<'X'|'O'|null>} board 9 cells
      * @param {'minimax'|'alphabeta'} algorithm
      * @returns {{ move, value, nodes, prunes }}
@@ -106,28 +112,44 @@
         return { move, value, nodes: stats.nodes, prunes: stats.prunes };
     }
 
+    /**
+     * The move the game actually plays at a given level. Every candidate is
+     * scored exactly (no pruning at the root) so that equally good moves can
+     * be told apart and one picked at random.
+     */
+    function chooseMove(board, level = 'hard', rand = Math.random) {
+        if (level === 'hard') return bestMove(board).move;
+        const maxDepth = LEVELS[level] ?? LEVELS.hard;
+        const work = [...board];
+        const scored = emptyCells(work).map((i) => {
+            work[i] = AI;
+            const v = alphaBeta(work, 1, false, -Infinity, Infinity, { nodes: 0, prunes: 0 }, maxDepth);
+            work[i] = null;
+            return { i, v };
+        });
+        const top = Math.max(...scored.map((s) => s.v));
+        const options = scored.filter((s) => s.v === top);
+        return options[Math.floor(rand() * options.length)].i;
+    }
+
     // ── Browser widget ───────────────────────────────────────────────
-    // mount(container) renders a self-contained game into `container`.
     function mount(container) {
         const doc = container.ownerDocument;
         let board = Array(9).fill(null);
         let over = false;
-        let score = { you: 0, ai: 0, draw: 0 };
+        const score = { you: 0, ai: 0, draw: 0 };
 
         container.innerHTML = `
             <div class="ttt">
                 <div class="ttt-head">
-                    <strong>Pass the wait: beat the AI</strong>
-                    <label class="ttt-algo">AI search:
-                        <select data-ttt="algo">
-                            <option value="alphabeta" selected>Alpha-beta</option>
-                            <option value="minimax">Minimax</option>
-                        </select>
-                    </label>
+                    <strong>Play while you wait</strong>
+                    <div class="ttt-levels" role="group" aria-label="Difficulty">
+                        <button type="button" data-level="easy" aria-pressed="true">Easy</button>
+                        <button type="button" data-level="hard" aria-pressed="false">Hard</button>
+                    </div>
                 </div>
                 <div class="ttt-board" data-ttt="board" role="grid" aria-label="Tic-tac-toe board"></div>
-                <div class="ttt-status" data-ttt="status" aria-live="polite">You are X. Your move.</div>
-                <div class="ttt-stats" data-ttt="stats"></div>
+                <div class="ttt-status" data-ttt="status" aria-live="polite">You're X. Your move.</div>
                 <div class="ttt-foot">
                     <span data-ttt="score"></span>
                     <button type="button" data-ttt="reset">New game</button>
@@ -136,9 +158,9 @@
 
         const boardEl = container.querySelector('[data-ttt="board"]');
         const statusEl = container.querySelector('[data-ttt="status"]');
-        const statsEl = container.querySelector('[data-ttt="stats"]');
         const scoreEl = container.querySelector('[data-ttt="score"]');
-        const algoEl = container.querySelector('[data-ttt="algo"]');
+        const levelButtons = [...container.querySelectorAll('[data-level]')];
+        let level = 'easy';
 
         const cells = Array.from({ length: 9 }, (_, i) => {
             const b = doc.createElement('button');
@@ -156,22 +178,22 @@
                 c.disabled = over || Boolean(board[i]);
                 c.classList.toggle('ttt-win', Boolean(winLine && winLine.includes(i)));
             });
-            scoreEl.textContent = `You ${score.you} · AI ${score.ai} · Draws ${score.draw}`;
+            scoreEl.textContent = `You ${score.you} · Q-Sense ${score.ai} · Draws ${score.draw}`;
         }
 
         function finish() {
             const w = winner(board);
             if (w) {
                 over = true;
-                if (w.player === HUMAN) { score.you++; statusEl.textContent = 'You won! (That should be impossible…)'; }
-                else { score.ai++; statusEl.textContent = 'The AI wins this round.'; }
+                if (w.player === HUMAN) { score.you++; statusEl.textContent = level === 'easy' ? 'You won! Try Hard mode.' : 'You won!'; }
+                else { score.ai++; statusEl.textContent = 'Q-Sense wins this one.'; }
                 render(w.line);
                 return true;
             }
             if (emptyCells(board).length === 0) {
                 over = true;
                 score.draw++;
-                statusEl.textContent = 'Draw — perfect play on both sides.';
+                statusEl.textContent = level === 'hard' ? "Draw — that's the best anyone can do on Hard." : 'Draw!';
                 render();
                 return true;
             }
@@ -182,40 +204,31 @@
             if (over || board[i]) return;
             board[i] = HUMAN;
             if (finish()) return;
-
-            const algorithm = algoEl.value;
-            const t0 = (root.performance || Date).now();
-            const result = bestMove(board, algorithm);
-            const ms = ((root.performance || Date).now() - t0).toFixed(1);
-            board[result.move] = AI;
-
-            // Run the other algorithm on the same position purely to show
-            // the node-count difference — it picks an equally good move.
-            const other = bestMove(board.map((v, k) => (k === result.move ? null : v)), algorithm === 'minimax' ? 'alphabeta' : 'minimax');
-            const mm = algorithm === 'minimax' ? result : other;
-            const ab = algorithm === 'minimax' ? other : result;
-            statsEl.textContent = `AI searched ${result.nodes.toLocaleString()} positions in ${ms} ms · ` +
-                `minimax ${mm.nodes.toLocaleString()} vs alpha-beta ${ab.nodes.toLocaleString()} ` +
-                `(${Math.round((1 - ab.nodes / mm.nodes) * 100)}% pruned)`;
-
+            board[chooseMove(board, level)] = AI;
             if (!finish()) {
                 statusEl.textContent = 'Your move.';
                 render();
             }
         }
 
-        container.querySelector('[data-ttt="reset"]').addEventListener('click', () => {
+        function reset() {
             board = Array(9).fill(null);
             over = false;
-            statsEl.textContent = '';
-            statusEl.textContent = 'You are X. Your move.';
+            statusEl.textContent = "You're X. Your move.";
             render();
-        });
+        }
+
+        levelButtons.forEach((btn) => btn.addEventListener('click', () => {
+            level = btn.dataset.level;
+            levelButtons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+            reset();
+        }));
+        container.querySelector('[data-ttt="reset"]').addEventListener('click', reset);
 
         render();
     }
 
-    const api = { AI, HUMAN, winner, emptyCells, utility, minimax, alphaBeta, bestMove, mount };
+    const api = { AI, HUMAN, LEVELS, winner, emptyCells, utility, minimax, alphaBeta, bestMove, chooseMove, mount };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.TicTacToe = api;
 })(typeof window !== 'undefined' ? window : globalThis);
