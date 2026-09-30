@@ -8,6 +8,10 @@ import pytest
 # Ensure project root is on the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Load .env before the skipif below reads DATABASE_URL.
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
+
 
 # ── UNIT TESTS: predict_wait_time() ───────────────────────────────────
 

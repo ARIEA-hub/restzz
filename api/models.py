@@ -1,4 +1,7 @@
 # api/models.py
+# Mirrors the LIVE Supabase schema: the deployed tables have no created_at
+# columns, so the models must not declare them (SQLAlchemy selects every
+# mapped column, and a missing one fails the whole query).
 # SQLAlchemy ORM models — maps to the Supabase PostgreSQL schema
 
 from sqlalchemy import (
@@ -19,7 +22,6 @@ class Restaurant(Base):
     status        = Column(String(20), default="open")   # 'open' | 'closed'
     latitude      = Column(Float)                        # Feature C
     longitude     = Column(Float)                        # Feature C
-    created_at    = Column(DateTime(timezone=True), server_default=func.now())
 
     tables       = relationship("RestaurantTable", back_populates="restaurant")
     reservations = relationship("Reservation",     back_populates="restaurant")
@@ -39,7 +41,6 @@ class Customer(Base):
     latitude            = Column(Float)                    # Feature C
     longitude           = Column(Float)                    # Feature C
     location_updated_at = Column(DateTime(timezone=True))
-    created_at          = Column(DateTime(timezone=True), server_default=func.now())
 
     reservations = relationship("Reservation", back_populates="customer")
     queue        = relationship("Queue",       back_populates="customer")
@@ -56,7 +57,6 @@ class Admin(Base):
     password      = Column(String(255))
     role          = Column(String(50), default="staff")   # 'owner'|'manager'|'staff'
     is_verified   = Column(Boolean, default=False)         # Flow D
-    created_at    = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class RestaurantTable(Base):
@@ -67,7 +67,6 @@ class RestaurantTable(Base):
     table_no      = Column(String(20), nullable=False)
     capacity      = Column(Integer, default=4)
     status        = Column(String(20), default="vacant")
-    updated_at    = Column(DateTime(timezone=True), server_default=func.now())
 
     restaurant = relationship("Restaurant", back_populates="tables")
 
@@ -83,7 +82,6 @@ class Reservation(Base):
     reserve_date  = Column(Date, nullable=False)
     reserve_time  = Column(Time, nullable=False)
     status        = Column(String(20), default="reserved")
-    created_at    = Column(DateTime(timezone=True), server_default=func.now())
 
     customer   = relationship("Customer",        back_populates="reservations")
     restaurant = relationship("Restaurant",      back_populates="reservations")

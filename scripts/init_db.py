@@ -63,8 +63,7 @@ CREATE TABLE IF NOT EXISTS restaurant_tables (
     table_no        VARCHAR(20)     NOT NULL,
     capacity        INTEGER         DEFAULT 4,
     status          VARCHAR(20)     DEFAULT 'vacant'
-                    CHECK (status IN ('vacant','occupied','reserved','unavailable')),
-    updated_at      TIMESTAMPTZ     DEFAULT NOW()
+                    CHECK (status IN ('vacant','occupied','reserved','unavailable'))
 );
 
 CREATE TABLE IF NOT EXISTS reservation (
@@ -113,11 +112,11 @@ ON CONFLICT DO NOTHING;
 try:
     cur.execute(SCHEMA)
     conn.commit()
-    print("✅ Database schema created successfully.")
+    print("[ok] Database schema created successfully.")
     print("   Tables: restaurant, customer, admin, restaurant_tables, reservation, queue")
 except Exception as e:
     conn.rollback()
-    print(f"❌ Schema creation failed: {e}")
+    print(f"[error] Schema creation failed: {e}")
 finally:
     cur.close()
     conn.close()
